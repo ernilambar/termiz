@@ -106,6 +106,11 @@ directory of the file that names it, and `~` and `$VAR` expand. A missing
 target, a cycle, or a chain more than 8 files deep is logged and skipped; the
 rest of the file still applies.
 
+`Termiz > Settings` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
+this file with it; when neither is set the default text editor opens it. The
+directory is created when missing. The app never rewrites settings, so the
+editor is the one that changes the contents.
+
 `terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
 window runs, and the child is given the matching `SHELL`. Leave it empty to
 keep the `$SHELL` → OS login shell resolution.

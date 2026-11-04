@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Termiz</title>
+  <desc>Full-bleed app icon: opaque canvas, macOS applies the squircle mask.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#2d3342"/>
+      <stop offset="0.55" stop-color="#171a22"/>
+      <stop offset="1" stop-color="#0a0c10"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.16" r="0.9">
+      <stop offset="0" stop-color="#5b6a86" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#5b6a86" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#5b6a86" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="prompt" gradientUnits="userSpaceOnUse" x1="194" y1="259" x2="810" y2="765">
+      <stop offset="0" stop-color="#5adcf5"/>
+      <stop offset="0.45" stop-color="#29b8db"/>
+      <stop offset="1" stop-color="#23d18b"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <g fill="none" stroke="url(#prompt)" stroke-width="115.0" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)">
+    <path d="M 254.4,288.9 L 498.2,512.0 L 254.4,735.1"/>
+    <path d="M 615.5,735.1 L 769.6,735.1"/>
+  </g>
+</svg>

@@ -49,16 +49,28 @@ go build ./...
   add platform branches without a matching `runtime.GOOS` guard. A
   `terminal.shell` in the config file outranks `$SHELL` by design; that
   precedence lives in `shellSpec`, not in `loginShell`.
-- Configuration is read, never written. `defaultConfig` in `config.go` is the
-  only place the built-in values live, and `launch` takes every window and
-  terminal value from the loaded struct instead of a literal. Loading is
-  forgiving on purpose: a missing file means defaults, and a malformed file,
-  unknown key or out-of-range value is logged and replaced by its default
-  rather than failing startup. A file that does not parse is ignored whole.
+- Configuration is read by the loader, never written. `defaultConfig` in
+  `config.go` is the only place the built-in values live, and `launch` takes
+  every window and terminal value from the loaded struct instead of a literal.
+  Loading is forgiving on purpose: a missing file means defaults, and a
+  malformed file, unknown key or out-of-range value is logged and replaced by
+  its default rather than failing startup. A file that does not parse is
+  ignored whole.
   `config_file` loads another file as the base, so settings can live outside
   `~/.config`: the including file is decoded on top, a relative target resolves
   against the including file's directory, and a missing target, a cycle or a
   chain deeper than `maxConfigIncludes` is a warning, not an error.
+- `Termiz > Settings` (`menu.go`) opens the config in `$VISUAL`,
+  then `$EDITOR`, and otherwise in the system text editor. The item belongs in
+  the app menu, but go-gui's native app menu has no slot for app-defined items:
+  `installMenubar` declares a throwaway top-level menu and
+  `moveMenuItemsIntoAppMenu` (`menu_darwin.go`, cgo; `menu_other.go` is the
+  stub) moves its items above Quit and removes the empty menu. Installing a
+  native menubar needs App mode (`gui.NewApp` + `backend.RunApp`): only a
+  registered App owns one. `open(1)` does not inherit the caller's environment,
+  so the `dev.sh` CLI shim forwards `VISUAL` and `EDITOR`. The action creates
+  the config directory and, for the system-editor fallback only, an empty
+  config file (TextEdit refuses a missing path); it never changes values.
 - Window maximization is macOS-only and lives behind `maximizeWindow`
   (`window_darwin.go`, cgo; `window_other.go` is the stub): go-gui exposes no
   maximize or fullscreen call, so the Darwin build zooms the AppKit key window
@@ -76,6 +88,16 @@ go build ./...
   name is spelled; the scripts and workflow read it from there. The release
   version comes from the git tag through `-version`; do not add a version to the
   manifest.
+- The icon lives in `assets/`: `icon.svg` is the editable source and `icon.png`
+  is the committed 1024×1024 full-bleed opaque render. macOS 26 and later mask
+  it to the app-icon squircle; a transparent canvas makes the system draw its
+  legacy gray plate behind the artwork instead. `appinfo.toml` names the PNG so
+  `buildapp` converts it to `Contents/Resources/termiz.icns` (`sips` +
+  `iconutil`) without an icon flag, and `main.go` embeds the same bytes as
+  `gui.WindowCfg.IconPNG` because go-gui substitutes its own default Dock icon
+  when that field is empty. Redraw the SVG and re-render the PNG at 1024×1024,
+  keeping the canvas opaque; keep the file name, which the packaging path and
+  the embed assume.
 - Theming goes through go-term's bundled corpus: `theme.name` is matched
   case-insensitively by `theme.go`, the resolved theme is passed as
   `Cfg.Themes[0]` so the spawned child's `COLORFGBG` agrees, and the go-gui

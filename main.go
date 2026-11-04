@@ -29,6 +29,17 @@ var manifest []byte
 
 var info = appinfo.MustParse(manifest)
 
+// iconPNG is the Dock icon while the app runs. go-gui hands
+// gui.WindowCfg.IconPNG to NSApplication's setApplicationIconImage and
+// substitutes its own default when that is empty. The Dock draws that image
+// as-is, without the squircle mask Finder and About apply to the bundle's
+// .icns, so the embedded copy is the pre-rounded asset: icon-dock.png is
+// icon.png on the 824px icon grid under the system's superellipse. Passing
+// the full-bleed icon.png here would show a square in the Dock.
+//
+//go:embed assets/icon-dock.png
+var iconPNG []byte
+
 // version is the app version: the bundle version cmd/buildapp writes, and the
 // version reported to children as TERM_PROGRAM_VERSION. The release tag must
 // match it, so bump this when cutting a release.
@@ -97,11 +108,16 @@ func launch() {
 	// resumes where the user was. The fallbacks live in startDir.
 	dir := startDir(cfg)
 
+	// App mode, not the single-window backend.Run: only a registered App
+	// owns a native menubar, which is where the settings item lives.
+	app := gui.NewApp()
+
 	var tm *term.Term
 	var stopDirWatch func()
 	w := gui.NewWindow(gui.WindowCfg{
 		// Title comes from the manifest's name when left empty.
 		AppInfo:   info,
+		IconPNG:   iconPNG,
 		Width:     cfg.Window.Width,
 		Height:    cfg.Window.Height,
 		MinWidth:  cfg.Window.MinWidth,
@@ -110,6 +126,7 @@ func launch() {
 			if cfg.Window.Maximize {
 				maximizeWindow()
 			}
+			installMenubar(w.App())
 
 			var err error
 			tm, err = term.New(w, term.Cfg{
@@ -148,7 +165,7 @@ func launch() {
 	}()
 
 	gui.SetTheme(chromeTheme(theme))
-	backend.Run(w)
+	backend.RunApp(app, w)
 }
 
 // loginShell resolves the user's shell. $SHELL is authoritative when set; a

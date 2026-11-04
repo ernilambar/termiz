@@ -10,3 +10,11 @@
 # -version, so there is one source instead of a second file to bump.
 id   = "net.nilambar.termiz"
 name = "Termiz"
+
+# The icon is a full-bleed 1024x1024 PNG: an opaque canvas whose artwork the
+# system masks to the app-icon squircle on macOS 26 and later. A transparent
+# canvas makes the system draw its legacy plate behind the artwork instead.
+# buildapp converts the PNG to Contents/Resources/termiz.icns with sips and
+# iconutil; assets/icon.svg is the editable source. The path is relative to
+# this file.
+icon = "assets/icon.png"
