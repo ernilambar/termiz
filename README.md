@@ -1,13 +1,10 @@
-# termiz
+# Termiz
 
-A terminal emulator built on [go-gui](https://github.com/go-gui-org/go-gui) and
-[go-term](https://github.com/go-gui-org/go-term).
+**One window. One shell. Nothing in the way.**
 
-One window, one live shell on a PTY, rendered through go-gui's GPU backend.
-The shell is `$SHELL`; when the environment carries no `SHELL` (a Finder launch),
-the account's login shell is resolved instead of falling back to `/bin/sh`.
-Closing the window tears down the shell, and the window closes when the shell
-exits.
+A minimal, GPU-accelerated terminal emulator for macOS. It gives you a real
+shell on a PTY in a small native window — no browser engine, no tabs, no panes,
+no configuration.
 
 ## Install
 
