@@ -31,6 +31,23 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check tag matches version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # The version lives in main.go; the tag must match it, so a release
+          # cannot ship a bundle and binary that disagree.
+          version="$(sed -n 's/^const version = "\(.*\)"$/\1/p' main.go)"
+          if [ -z "$version" ]; then
+            echo "main.go has no version constant" >&2
+            exit 1
+          fi
+          if [ "v$version" != "$TAG" ]; then
+            echo "tag $TAG does not match main.go version $version" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Test
         run: go test ./...
 
@@ -60,7 +77,7 @@ jobs:
           go run github.com/go-gui-org/go-gui/cmd/buildapp \
             -o "$PWD/dist" \
             -manifest "$PWD/appinfo.toml" \
-            -version "${GITHUB_REF_NAME#v}" \
+            -version "$VERSION" \
             dist/terming
           app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/terming")"
           if [ "$app_arch" != "arm64" ]; then

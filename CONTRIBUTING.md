@@ -58,8 +58,8 @@ builds the same archive a release publishes, without installing anything:
 
 The display name and bundle ID live in `appinfo.toml`. `main.go` embeds that
 file for the running app and `cmd/buildapp` reads it when packaging, so the two
-identities cannot drift. Do not add a version to the manifest: the release
-version is the git tag.
+identities cannot drift. Do not add a version to the manifest: the app
+version is `version` in `main.go`.
 
 ## Code layout
 
@@ -96,12 +96,14 @@ the shell responds.
 
 ## Release
 
-Maintainers only. There is no version file: the git tag is the version. Make
-sure the quality gate passes, then tag and push:
+Maintainers only. `version` in `main.go` is the single source of truth, and
+the release workflow rejects a tag that does not match it. Bump the constant,
+pass the quality gate, then tag and push:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+# edit version in main.go
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The Release workflow builds `darwin/arm64`, packages the `.app` with

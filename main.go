@@ -27,6 +27,11 @@ var manifest []byte
 
 var info = appinfo.MustParse(manifest)
 
+// version is the app version: the bundle version cmd/buildapp writes, and the
+// version reported to children as TERM_PROGRAM_VERSION. The release tag must
+// match it, so bump this when cutting a release.
+const version = "0.1.0"
+
 func main() {
 	command := loginShell()
 	var env []string
@@ -45,13 +50,14 @@ func main() {
 		OnInit: func(w *gui.Window) {
 			var err error
 			tm, err = term.New(w, term.Cfg{
-				TextStyle:      gui.TextStyle{Family: "monospace", Size: 14},
-				ScrollbackRows: 10000,
-				CursorBlink:    true,
-				Identity:       "terming",
-				Command:        command,
-				Env:            env,
-				OnExit:         w.Close,
+				TextStyle:       gui.TextStyle{Family: "monospace", Size: 14},
+				ScrollbackRows:  10000,
+				CursorBlink:     true,
+				Identity:        "terming",
+				IdentityVersion: version,
+				Command:         command,
+				Env:             env,
+				OnExit:          w.Close,
 			})
 			if err != nil {
 				log.Printf("term.New: %v", err)

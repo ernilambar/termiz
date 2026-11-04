@@ -33,9 +33,12 @@ if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" != "1" ]; then
     exit 1
 fi
 
-# The tag is the one version source; appinfo.toml carries only the identity.
-version="$(git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)"
-version="${version#v}"
+# The version lives in main.go; the release tag must match it.
+version="$(sed -n 's/^const version = "\(.*\)"$/\1/p' main.go)"
+if [ -z "$version" ]; then
+    printf 'error: main.go has no version constant\n' >&2
+    exit 1
+fi
 
 printf '==> gofmt\n'
 unformatted="$(gofmt -l .)"

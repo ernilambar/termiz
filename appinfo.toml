@@ -5,7 +5,8 @@
 # name is the display name and the only place it is spelled: the scripts and
 # the release workflow read it from this file, so a rename edits this line.
 #
-# version is deliberately absent: the release version is the git tag, passed to
-# buildapp as -version, so it has a single source instead of a file to bump.
+# version is deliberately absent: the app version lives in main.go's `version`
+# constant, which the scripts and the release workflow pass to buildapp as
+# -version, so there is one source instead of a second file to bump.
 id   = "com.ernilambar.terming"
 name = "Terming"
