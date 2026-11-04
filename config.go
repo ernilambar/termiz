@@ -37,7 +37,7 @@ import (
 //	scrollback_rows = 10000
 //	cursor_blink    = true
 //	shell           = ""   # empty: $SHELL, then the OS login shell
-//	dir             = ""   # empty: the home directory; ~ and $VAR expand
+//	dir             = ""   # empty: last session's directory, then home
 //
 // Reading is deliberately forgiving: a broken file, a bad value or an unknown
 // key is logged and the default is used, because a typo in a settings file
@@ -90,7 +90,10 @@ type terminalConfig struct {
 	ScrollbackRows int    `toml:"scrollback_rows"`
 	CursorBlink    bool   `toml:"cursor_blink"`
 	Shell          string `toml:"shell"`
-	Dir            string `toml:"dir"`
+	// Dir is the shell's starting directory; ~ and $VAR expand. Empty restores
+	// the directory the previous session ended in (see state.go), falling back
+	// to the home directory when there is none or it no longer exists.
+	Dir string `toml:"dir"`
 }
 
 // Defaults are the values the app has always started with.

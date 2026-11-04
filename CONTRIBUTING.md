@@ -70,8 +70,9 @@ Everything is `package main` in `main.go` until there is a real reason to split
 packages. `main` wires the window to `term.Term`; `config.go` reads the optional
 settings file and owns the built-in defaults, `theme.go` resolves a configured
 theme name against go-term's bundled corpus and maps its light/dark character
-to the window chrome, and `loginShell` resolves the shell and is the one place
-platform branches belong.
+to the window chrome, `state.go` persists the last shell directory, and
+`loginShell` resolves the shell and is the one place platform branches belong
+(alongside `window_*.go` and the child-cwd lookup in `cwd_*.go`).
 
 ## Check locally before opening a pull request
 

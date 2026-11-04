@@ -20,7 +20,9 @@ No environment variables or secrets are needed. The app reads `$SHELL` at
 runtime; when it is unset the login shell is resolved from the OS. An optional
 config file at `$XDG_CONFIG_HOME/termiz/config.toml` (default
 `~/.config/termiz/config.toml`) sets the window, font, theme and terminal
-values; see `config.go`.
+values; see `config.go`. A written state file at
+`$XDG_STATE_HOME/termiz/state.toml` (default `~/.local/state/termiz/state.toml`)
+restores the last shell directory; see `state.go`.
 
 ## Commands
 
@@ -80,6 +82,15 @@ go build ./...
   chrome is picked from `Theme.IsDark` (`chromeTheme`). A theme name the corpus
   does not know is a warning and falls back to `Default`; never invent a
   palette, and keep `termiz themes` the authoritative list.
+- Session state is separate from config and written, never read as settings:
+  `state.go` samples the shell's directory every 2s (`watchDir`, writing only
+  on change, so an exiting shell or a crash still leaves the last directory)
+  and flushes it in `rememberDir`, which must run before `tm.Close()` while the
+  shell is still alive. `terminal.dir` pins the start directory and suppresses
+  both writes. The directory is the shell's OSC 7 report (`cwdLocalPath`,
+  percent-decoded) when it emits one, else the shell process cwd
+  (`cwd_darwin.go` via libproc, `cwd_linux.go` via /proc, `cwd_other.go` stub).
+  Keep the state write atomic and the file 0600.
 - Do not introduce external dependencies without updating `go.mod`/`go.sum`
   and checking that non-macOS builds remain cgo-free.
 

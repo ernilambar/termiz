@@ -92,21 +92,13 @@ func launch() {
 		themeName = themeNameDefault
 	}
 
-	// A GUI launch (Finder, app bundle) inherits "/" as its working directory,
-	// so letting the child inherit it would open the shell at the filesystem
-	// root. terminal.dir, already expanded and checked by the config loader,
-	// wins; otherwise start in the user's home. On failure dir stays empty and
-	// the child inherits this process's directory, go-term's own default.
-	dir := cfg.Terminal.Dir
-	if dir == "" {
-		var err error
-		dir, err = os.UserHomeDir()
-		if err != nil {
-			log.Printf("os.UserHomeDir: %v", err)
-		}
-	}
+	// terminal.dir is an explicit choice; without it the previous session's
+	// directory is restored when it still exists, so quitting and reopening
+	// resumes where the user was. The fallbacks live in startDir.
+	dir := startDir(cfg)
 
 	var tm *term.Term
+	var stopDirWatch func()
 	w := gui.NewWindow(gui.WindowCfg{
 		// Title comes from the manifest's name when left empty.
 		AppInfo:   info,
@@ -140,10 +132,17 @@ func launch() {
 				return
 			}
 			w.SetView(tm.View)
+			stopDirWatch = watchDir(tm, cfg)
 		},
 	})
 	defer func() {
 		if tm != nil {
+			// Stop sampling before Close, and save while the shell is still
+			// alive so the process-cwd fallback can answer on a window close.
+			if stopDirWatch != nil {
+				stopDirWatch()
+			}
+			rememberDir(tm, cfg)
 			_ = tm.Close()
 		}
 	}()
