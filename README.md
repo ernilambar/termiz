@@ -45,3 +45,6 @@ gate and produces the same archive the release workflow publishes:
 
 Configuration and theme selection are a later phase; this is the live-terminal
 foundation.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
+checks a change must pass.
