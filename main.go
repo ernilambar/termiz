@@ -3,6 +3,7 @@
 package main
 
 import (
+	_ "embed"
 	"log"
 	"os"
 	"os/exec"
@@ -11,9 +12,20 @@ import (
 	"strings"
 
 	"github.com/go-gui-org/go-gui/gui"
+	"github.com/go-gui-org/go-gui/gui/appinfo"
 	"github.com/go-gui-org/go-gui/gui/backend"
 	"github.com/go-gui-org/go-term/term"
 )
+
+// appinfo.toml is the one place the bundle ID and display name are written:
+// cmd/buildapp reads the same file when packaging the .app bundle, while the
+// compiled-in copy gives the running app the same identity, so macOS keeps
+// preferences and permission grants under a single ID.
+//
+//go:embed appinfo.toml
+var manifest []byte
+
+var info = appinfo.MustParse(manifest)
 
 func main() {
 	command := loginShell()
@@ -24,7 +36,8 @@ func main() {
 
 	var tm *term.Term
 	w := gui.NewWindow(gui.WindowCfg{
-		Title:     "Terming",
+		// Title comes from the manifest's name when left empty.
+		AppInfo:   info,
 		Width:     1000,
 		Height:    640,
 		MinWidth:  400,

@@ -29,6 +29,9 @@ gofmt -l .
 gofmt -w .
 go build ./...
 ./terming
+./scripts/dev.sh
+./scripts/dev.sh --release
+./scripts/bundle.sh
 ```
 
 ## Conventions
@@ -45,6 +48,12 @@ go build ./...
 - Comment any non-obvious platform or lifecycle behavior in place (both
   `main` and `loginShell` carry such comments); do not add comments that merely
   restate the code.
+- `appinfo.toml` holds the app ID and display name: `main.go` embeds it for the
+  running app and `cmd/buildapp` reads the same file when packaging the bundle,
+  so the two identities cannot diverge. `name` is the only place the display
+  name is spelled; the scripts and workflow read it from there. The release
+  version comes from the git tag through `-version`; do not add a version to the
+  manifest.
 - Do not introduce external dependencies without updating `go.mod`/`go.sum`
   and checking that non-macOS builds remain cgo-free.
 
