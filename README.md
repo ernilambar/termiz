@@ -77,8 +77,8 @@ min_width  = 400
 min_height = 240
 
 [font]
-family = "monospace"
-size   = 14          # 6–72
+family = "Menlo"
+size   = 12          # 6–72
 
 [terminal]
 scrollback_rows = 10000  # 0: go-term's 5000 rows, negative: no scrollback

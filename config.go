@@ -27,8 +27,8 @@ import (
 //	min_height = 240
 //
 //	[font]
-//	family = "monospace"
-//	size   = 14
+//	family = "Menlo"
+//	size   = 12
 //
 //	[terminal]
 //	scrollback_rows = 10000
@@ -87,8 +87,8 @@ const (
 	defaultHeight     = 640
 	defaultMinWidth   = 400
 	defaultMinHeight  = 240
-	defaultFontFamily = "monospace"
-	defaultFontSize   = 14
+	defaultFontFamily = "Menlo"
+	defaultFontSize   = 12
 	defaultScrollback = 10000
 	// The usable font range: below it text is unreadable, above it a cell no
 	// longer fits the 24x80 grid the PTY starts with.
