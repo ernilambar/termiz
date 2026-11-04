@@ -30,6 +30,9 @@ usage() {
 usage: scripts/dev.sh [--release]
 
   --release  build with the release workflow flags and verify the arm64 arch
+
+Also installs a `termiz` CLI shim in /usr/local/bin when writable, else in
+~/.local/bin. Set TERMIZ_BIN_DIR to choose the directory.
 EOF
 }
 
@@ -110,4 +113,41 @@ ditto "$app" "$dest"
 "$lsregister" -f "$dest"
 
 printf 'Installed %s (%s) to %s\n' "$app" "$version" "$dest"
+
+# The CLI is a shim, not a symlink to the app's main binary: a bare `termiz`
+# must go through open(1) so LaunchServices gives the app its Dock icon,
+# activation and single-instance behavior, while informational commands exec
+# the bundle binary directly so their output reaches the terminal. The usual
+# /usr/local/bin is on the default PATH but root-owned on stock macOS, so fall
+# back to a per-user directory rather than requiring sudo.
+bin_dir="${TERMIZ_BIN_DIR:-}"
+if [ -z "$bin_dir" ]; then
+    if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
+        bin_dir=/usr/local/bin
+    else
+        bin_dir="$HOME/.local/bin"
+    fi
+fi
+mkdir -p "$bin_dir"
+cli="$bin_dir/termiz"
+cat >"$cli" <<EOF
+#!/bin/sh
+# Installed by termiz's scripts/dev.sh.
+app="$dest"
+if [ "\$#" -eq 0 ]; then
+    exec open "\$app"
+fi
+exec "\$app/Contents/MacOS/termiz" "\$@"
+EOF
+chmod +x "$cli"
+
+printf 'Installed CLI %s\n' "$cli"
+case ":$PATH:" in
+    *":$bin_dir:"*) ;;
+    *)
+        printf 'note: %s is not on PATH; add it to run termiz directly:\n' "$bin_dir"
+        printf '  export PATH="%s:$PATH"\n' "$bin_dir"
+        ;;
+esac
+
 open "$dest"

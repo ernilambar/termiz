@@ -49,8 +49,11 @@ the identity in `appinfo.toml` — build, install, and relaunch in one step:
 ```
 
 This replaces `/Applications/<Name>.app` and kills the running copy, so any
-shell session in it is lost. `./scripts/bundle.sh` runs the quality gate and
-builds the same archive a release publishes, without installing anything:
+shell session in it is lost. It also installs a `termiz` CLI shim — in
+`/usr/local/bin` when writable, else `~/.local/bin`, unless `TERMIZ_BIN_DIR`
+says otherwise — so `termiz --help` and `termiz --version` work from a shell.
+`./scripts/bundle.sh` runs the quality gate and builds the same archive a
+release publishes, without installing anything:
 
 ```sh
 ./scripts/bundle.sh          # dist/<Name>-macos-arm64.zip + SHA256SUMS

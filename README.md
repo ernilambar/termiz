@@ -31,25 +31,31 @@ go build -o termiz .
 ```
 
 Or use the scripts. `dev.sh` builds the app bundle with go-gui's `buildapp`,
-installs it to `/Applications` and relaunches it; `bundle.sh` runs the quality
-gate and produces the same archive the release workflow publishes:
+installs it to `/Applications`, installs a `termiz` command and relaunches the
+app; `bundle.sh` runs the quality gate and produces the same archive the
+release workflow publishes:
 
 ```bash
-./scripts/dev.sh             # debug build, install to /Applications, relaunch
+./scripts/dev.sh             # debug build, install app + CLI, relaunch
 ./scripts/dev.sh --release   # release build, verify arm64, install, relaunch
 ./scripts/bundle.sh          # gate, release build, dist/<Name>-macos-arm64.zip
 ```
+
+The `termiz` command goes in `/usr/local/bin` when that directory is writable,
+otherwise in `~/.local/bin`; set `TERMIZ_BIN_DIR` to pick another directory.
+The script prints a `PATH` hint when the chosen directory is not on it.
 
 With no arguments, `termiz` opens the window. The command line otherwise only
 carries informational commands:
 
 ```bash
-./termiz --help      # or -h, or `help`
-./termiz --version   # or -V, or `version`
+termiz --help      # or -h, or `help`
+termiz --version   # or -V, or `version`
 ```
 
-The version printed is `version` in `main.go`, the same value the release tag
-must match and the bundled app reports to its children.
+Run them as `./termiz …` to use the repository build instead. The version
+printed is `version` in `main.go`, the same value the release tag must match
+and the bundled app reports to its children.
 
 Configuration and theme selection are a later phase; this is the live-terminal
 foundation.
