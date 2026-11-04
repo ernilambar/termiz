@@ -4,6 +4,8 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -32,7 +34,46 @@ var info = appinfo.MustParse(manifest)
 // match it, so bump this when cutting a release.
 const version = "0.1.0"
 
+// main dispatches the command line. A bundled launch passes no arguments, so
+// anything unrecognized is a user mistake and is reported rather than opening
+// a window that ignores what was asked for.
 func main() {
+	if len(os.Args) > 1 {
+		switch arg := os.Args[1]; arg {
+		case "-h", "--help", "help":
+			usage(os.Stdout)
+			return
+		case "-V", "--version", "version":
+			fmt.Printf("termiz %s\n", version)
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "termiz: unknown argument %q\n\n", arg)
+			usage(os.Stderr)
+			os.Exit(2)
+		}
+	}
+
+	launch()
+}
+
+// usage writes the synopsis: no arguments opens the window, and the only
+// other commands are informational.
+func usage(w io.Writer) {
+	fmt.Fprint(w, `usage: termiz [command]
+
+Commands:
+  help       print this help and exit
+  version    print the version and exit
+
+Flags:
+  -h, --help     print this help and exit
+  -V, --version  print the version and exit
+
+With no command, termiz opens a native window running the login shell on a PTY.
+`)
+}
+
+func launch() {
 	command := loginShell()
 	var env []string
 	if command != "" && os.Getenv("SHELL") == "" {

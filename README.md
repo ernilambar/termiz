@@ -40,6 +40,17 @@ gate and produces the same archive the release workflow publishes:
 ./scripts/bundle.sh          # gate, release build, dist/<Name>-macos-arm64.zip
 ```
 
+With no arguments, `termiz` opens the window. The command line otherwise only
+carries informational commands:
+
+```bash
+./termiz --help      # or -h, or `help`
+./termiz --version   # or -V, or `version`
+```
+
+The version printed is `version` in `main.go`, the same value the release tag
+must match and the bundled app reports to its children.
+
 Configuration and theme selection are a later phase; this is the live-terminal
 foundation.
 
