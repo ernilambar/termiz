@@ -1,4 +1,4 @@
-module github.com/ernilambar/terming
+module github.com/ernilambar/termiz
 
 go 1.27.3
 

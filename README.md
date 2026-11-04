@@ -1,4 +1,4 @@
-# terming
+# termiz
 
 A terminal emulator built on [go-gui](https://github.com/go-gui-org/go-gui) and
 [go-term](https://github.com/go-gui-org/go-term).
@@ -29,8 +29,8 @@ Requires Go 1.27.3+ and, on macOS, a C toolchain (the Metal backend is
 Objective-C). Linux and Windows build cgo-free.
 
 ```bash
-go build -o terming .
-./terming
+go build -o termiz .
+./termiz
 ```
 
 Or use the scripts. `dev.sh` builds the app bundle with go-gui's `buildapp`,

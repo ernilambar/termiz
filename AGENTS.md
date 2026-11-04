@@ -2,9 +2,9 @@
 
 ## Overview
 
-`terming` is a minimal terminal emulator: one native, GPU-accelerated window
+`termiz` is a minimal terminal emulator: one native, GPU-accelerated window
 running a real shell on a PTY. Core stack is Go (module
-`github.com/ernilambar/terming`) with `go-gui` for windowing/rendering and
+`github.com/ernilambar/termiz`) with `go-gui` for windowing/rendering and
 `go-term` for terminal emulation.
 
 ## Setup
@@ -22,13 +22,13 @@ No environment variables, config files, or secrets are needed. The app reads
 ## Commands
 
 ```bash
-go build -o terming .
+go build -o termiz .
 go test ./...
 go vet ./...
 gofmt -l .
 gofmt -w .
 go build ./...
-./terming
+./termiz
 ./scripts/dev.sh
 ./scripts/dev.sh --release
 ./scripts/bundle.sh
@@ -62,8 +62,8 @@ go build ./...
 Run these in order and confirm each exits 0 before declaring work complete:
 
 ```bash
-gofmt -l . && go vet ./... && go test ./... && go build -o terming .
+gofmt -l . && go vet ./... && go test ./... && go build -o termiz .
 ```
 
 `gofmt -l .` must print nothing. For UI/runtime changes, also launch the binary
-with `./terming` and confirm the window opens and the shell responds.
+with `./termiz` and confirm the window opens and the shell responds.

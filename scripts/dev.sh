@@ -78,14 +78,14 @@ fi
 printf '==> go build (%s)\n' "$profile"
 if $release; then
     CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-        go build -trimpath -ldflags="-s -w" -o dist/terming .
-    arch="$(lipo -archs dist/terming)"
+        go build -trimpath -ldflags="-s -w" -o dist/termiz .
+    arch="$(lipo -archs dist/termiz)"
     if [ "$arch" != "arm64" ]; then
         printf 'error: expected arm64 binary, got: %s\n' "$arch" >&2
         exit 1
     fi
 else
-    go build -o dist/terming .
+    go build -o dist/termiz .
 fi
 
 printf '==> buildapp\n'
@@ -96,7 +96,7 @@ go run github.com/go-gui-org/go-gui/cmd/buildapp \
     -o "$root/dist" \
     -manifest "$root/appinfo.toml" \
     -version "$version" \
-    "$root/dist/terming"
+    "$root/dist/termiz"
 
 if pkill -f "$dest/Contents/MacOS/"; then
     while pgrep -f "$dest/Contents/MacOS/" >/dev/null; do

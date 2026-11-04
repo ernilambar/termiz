@@ -25,16 +25,16 @@ before you write code.
 ### Set up
 
 ```sh
-git clone git@github.com:ernilambar/terming.git
-cd terming
+git clone git@github.com:ernilambar/termiz.git
+cd termiz
 go mod download
-go build -o terming .
+go build -o termiz .
 ```
 
 ## Fix and run
 
 ```sh
-./terming
+./termiz
 ```
 
 This opens the native window with a live shell; it needs a graphical macOS

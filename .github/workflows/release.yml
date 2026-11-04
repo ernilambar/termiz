@@ -16,7 +16,7 @@ jobs:
     name: Build macOS arm64
     # The Metal backend is Objective-C, so cgo is mandatory on macOS. Every
     # macOS standard runner except the explicit `*-intel` images is Apple
-    # silicon; darwin/arm64 is the only target terming ships, so there is no
+    # silicon; darwin/arm64 is the only target termiz ships, so there is no
     # Intel job and no universal binary.
     runs-on: macos-15
     env:
@@ -63,10 +63,10 @@ jobs:
           echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
 
           mkdir -p dist
-          go build -trimpath -ldflags="-s -w" -o dist/terming .
+          go build -trimpath -ldflags="-s -w" -o dist/termiz .
           # Guards the single supported target: a misconfigured GOARCH must
           # fail the release instead of shipping a binary that will not launch.
-          arch="$(lipo -archs dist/terming)"
+          arch="$(lipo -archs dist/termiz)"
           if [ "$arch" != "arm64" ]; then
             echo "expected arm64 binary, got: $arch" >&2
             exit 1
@@ -78,8 +78,8 @@ jobs:
             -o "$PWD/dist" \
             -manifest "$PWD/appinfo.toml" \
             -version "$VERSION" \
-            dist/terming
-          app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/terming")"
+            dist/termiz
+          app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/termiz")"
           if [ "$app_arch" != "arm64" ]; then
             echo "expected arm64 app binary, got: $app_arch" >&2
             exit 1

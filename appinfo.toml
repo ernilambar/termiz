@@ -8,5 +8,5 @@
 # version is deliberately absent: the app version lives in main.go's `version`
 # constant, which the scripts and the release workflow pass to buildapp as
 # -version, so there is one source instead of a second file to bump.
-id   = "com.ernilambar.terming"
-name = "Terming"
+id   = "net.nilambar.termiz"
+name = "Termiz"

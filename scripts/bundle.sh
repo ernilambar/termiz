@@ -59,9 +59,9 @@ mkdir -p dist
 # Same flags as the release workflow so this is the artifact a tag publishes,
 # not a debug build.
 CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-    go build -trimpath -ldflags="-s -w" -o dist/terming .
+    go build -trimpath -ldflags="-s -w" -o dist/termiz .
 
-arch="$(lipo -archs dist/terming)"
+arch="$(lipo -archs dist/termiz)"
 if [ "$arch" != "arm64" ]; then
     printf 'error: expected arm64 binary, got: %s\n' "$arch" >&2
     exit 1
@@ -75,9 +75,9 @@ go run github.com/go-gui-org/go-gui/cmd/buildapp \
     -o "$root/dist" \
     -manifest "$root/appinfo.toml" \
     -version "$version" \
-    "$root/dist/terming"
+    "$root/dist/termiz"
 
-app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/terming")"
+app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/termiz")"
 if [ "$app_arch" != "arm64" ]; then
     printf 'error: expected arm64 app binary, got: %s\n' "$app_arch" >&2
     exit 1

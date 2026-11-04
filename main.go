@@ -1,4 +1,4 @@
-// Command terming is a terminal emulator: a real shell on a PTY, rendered by
+// Command termiz is a terminal emulator: a real shell on a PTY, rendered by
 // go-gui and go-term in a native GPU-accelerated window.
 package main
 
@@ -53,7 +53,7 @@ func main() {
 				TextStyle:       gui.TextStyle{Family: "monospace", Size: 14},
 				ScrollbackRows:  10000,
 				CursorBlink:     true,
-				Identity:        "terming",
+				Identity:        "termiz",
 				IdentityVersion: version,
 				Command:         command,
 				Env:             env,
