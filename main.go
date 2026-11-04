@@ -74,35 +74,37 @@ With no command, termiz opens a native window running the login shell on a PTY.
 }
 
 func launch() {
-	command := loginShell()
-	var env []string
-	if command != "" && os.Getenv("SHELL") == "" {
-		env = []string{"SHELL=" + command}
-	}
+	cfg := loadConfig()
+	command, env := shellSpec(cfg)
 
 	// A GUI launch (Finder, app bundle) inherits "/" as its working directory,
 	// so letting the child inherit it would open the shell at the filesystem
-	// root. Start in the user's home instead. On failure dir stays empty and
+	// root. terminal.dir, already expanded and checked by the config loader,
+	// wins; otherwise start in the user's home. On failure dir stays empty and
 	// the child inherits this process's directory, go-term's own default.
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("os.UserHomeDir: %v", err)
+	dir := cfg.Terminal.Dir
+	if dir == "" {
+		var err error
+		dir, err = os.UserHomeDir()
+		if err != nil {
+			log.Printf("os.UserHomeDir: %v", err)
+		}
 	}
 
 	var tm *term.Term
 	w := gui.NewWindow(gui.WindowCfg{
 		// Title comes from the manifest's name when left empty.
 		AppInfo:   info,
-		Width:     1000,
-		Height:    640,
-		MinWidth:  400,
-		MinHeight: 240,
+		Width:     cfg.Window.Width,
+		Height:    cfg.Window.Height,
+		MinWidth:  cfg.Window.MinWidth,
+		MinHeight: cfg.Window.MinHeight,
 		OnInit: func(w *gui.Window) {
 			var err error
 			tm, err = term.New(w, term.Cfg{
-				TextStyle:       gui.TextStyle{Family: "monospace", Size: 14},
-				ScrollbackRows:  10000,
-				CursorBlink:     true,
+				TextStyle:       gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)},
+				ScrollbackRows:  cfg.Terminal.ScrollbackRows,
+				CursorBlink:     cfg.Terminal.CursorBlink,
 				Identity:        "termiz",
 				IdentityVersion: version,
 				Command:         command,

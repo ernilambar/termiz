@@ -16,8 +16,11 @@ the Metal backend is Objective-C; Linux and Windows build cgo-free.
 go mod download
 ```
 
-No environment variables, config files, or secrets are needed. The app reads
-`$SHELL` at runtime; when it is unset the login shell is resolved from the OS.
+No environment variables or secrets are needed. The app reads `$SHELL` at
+runtime; when it is unset the login shell is resolved from the OS. An optional
+config file at `$XDG_CONFIG_HOME/termiz/config.toml` (default
+`~/.config/termiz/config.toml`) sets the window, font and terminal values; see
+`config.go`.
 
 ## Commands
 
@@ -41,7 +44,15 @@ go build ./...
 - The shell resolution rule in `loginShell` is deliberate: `$SHELL` wins, then
   the OS login shell (`dscl` on macOS, `getent` on Linux), and only an empty
   result defers to `go-term`'s fallback. Never substitute `/bin/sh`, and never
-  add platform branches without a matching `runtime.GOOS` guard.
+  add platform branches without a matching `runtime.GOOS` guard. A
+  `terminal.shell` in the config file outranks `$SHELL` by design; that
+  precedence lives in `shellSpec`, not in `loginShell`.
+- Configuration is read, never written. `defaultConfig` in `config.go` is the
+  only place the built-in values live, and `launch` takes every window and
+  terminal value from the loaded struct instead of a literal. Loading is
+  forgiving on purpose: a missing file means defaults, and a malformed file,
+  unknown key or out-of-range value is logged and replaced by its default
+  rather than failing startup. A file that does not parse is ignored whole.
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
   the `defer` in `main`, so closing the window tears down the PTY.

@@ -3,6 +3,7 @@ module github.com/ernilambar/termiz
 go 1.27.3
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/go-gui-org/go-gui v0.92.0
 	github.com/go-gui-org/go-term v0.17.1
 )

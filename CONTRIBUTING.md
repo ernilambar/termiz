@@ -67,7 +67,8 @@ version is `version` in `main.go`.
 ## Code layout
 
 Everything is `package main` in `main.go` until there is a real reason to split
-packages. `main` wires the window to `term.Term`; `loginShell` resolves the
+packages. `main` wires the window to `term.Term`; `config.go` reads the optional
+settings file and owns the built-in defaults, and `loginShell` resolves the
 shell and is the one place platform branches belong.
 
 ## Check locally before opening a pull request

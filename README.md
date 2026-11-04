@@ -4,7 +4,7 @@
 
 A minimal, GPU-accelerated terminal emulator for macOS. It gives you a real
 shell on a PTY in a small native window — no browser engine, no tabs, no panes,
-no configuration.
+and one optional file to change the window, the font and the terminal.
 
 ## Install
 
@@ -57,8 +57,38 @@ Run them as `./termiz …` to use the repository build instead. The version
 printed is `version` in `main.go`, the same value the release tag must match
 and the bundled app reports to its children.
 
-Configuration and theme selection are a later phase; this is the live-terminal
-foundation.
+## Configuration
+
+The app reads one optional file: `$XDG_CONFIG_HOME/termiz/config.toml`, or
+`~/.config/termiz/config.toml` when `XDG_CONFIG_HOME` is unset. It is read once
+at startup, so a change applies on the next launch. Everything is optional; a
+missing file means the defaults below. Unknown keys and out-of-range values are
+logged and replaced by the default, so a typo never keeps the window from
+opening.
+
+```toml
+[window]
+width      = 1000
+height     = 640
+min_width  = 400
+min_height = 240
+
+[font]
+family = "monospace"
+size   = 14          # 6–72
+
+[terminal]
+scrollback_rows = 10000  # 0: go-term's 5000 rows, negative: no scrollback
+cursor_blink    = true
+shell           = ""     # empty: $SHELL, then the OS login shell
+dir             = ""     # empty: home; ~ and $VAR expand
+```
+
+`terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
+window runs, and the child is given the matching `SHELL`. Leave it empty to
+keep the `$SHELL` → OS login shell resolution.
+
+Theme selection is a later phase.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
 checks a change must pass.
