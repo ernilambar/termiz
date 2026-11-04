@@ -39,6 +39,15 @@ func main() {
 		env = []string{"SHELL=" + command}
 	}
 
+	// A GUI launch (Finder, app bundle) inherits "/" as its working directory,
+	// so letting the child inherit it would open the shell at the filesystem
+	// root. Start in the user's home instead. On failure dir stays empty and
+	// the child inherits this process's directory, go-term's own default.
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("os.UserHomeDir: %v", err)
+	}
+
 	var tm *term.Term
 	w := gui.NewWindow(gui.WindowCfg{
 		// Title comes from the manifest's name when left empty.
@@ -57,6 +66,7 @@ func main() {
 				IdentityVersion: version,
 				Command:         command,
 				Env:             env,
+				Dir:             dir,
 				OnExit:          w.Close,
 			})
 			if err != nil {
