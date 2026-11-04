@@ -53,6 +53,10 @@ go build ./...
   forgiving on purpose: a missing file means defaults, and a malformed file,
   unknown key or out-of-range value is logged and replaced by its default
   rather than failing startup. A file that does not parse is ignored whole.
+  `config_file` loads another file as the base, so settings can live outside
+  `~/.config`: the including file is decoded on top, a relative target resolves
+  against the including file's directory, and a missing target, a cycle or a
+  chain deeper than `maxConfigIncludes` is a warning, not an error.
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
   the `defer` in `main`, so closing the window tears down the PTY.

@@ -17,6 +17,8 @@ import (
 // launch reads the struct, never a literal.
 //
 //	# ~/.config/termiz/config.toml
+//	config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
+//
 //	[window]
 //	width      = 1000
 //	height     = 640
@@ -38,6 +40,14 @@ import (
 // must not keep the window from opening. The file is read once at startup, so
 // a change applies on the next launch.
 type config struct {
+	// ConfigFile names another file to load as the base for this one, so the
+	// real settings can live wherever the user keeps them — a dotfiles
+	// repository, say — while ~/.config/termiz/config.toml stays a one-line
+	// pointer. Relative paths resolve against the directory of the file that
+	// names them, and ~ and $VAR expand. The file carrying this key is decoded
+	// on top of the included one, so it still wins for any value it sets.
+	ConfigFile string `toml:"config_file"`
+
 	Window   windowConfig   `toml:"window"`
 	Font     fontConfig     `toml:"font"`
 	Terminal terminalConfig `toml:"terminal"`
@@ -124,30 +134,68 @@ func loadConfig() config {
 	}
 	cfg, warnings := readConfig(path)
 	for _, w := range warnings {
-		log.Printf("config: %s: %s", path, w)
+		log.Printf("config: %s", w)
 	}
 	return cfg
 }
 
-// readConfig decodes path into a copy of the defaults, so a key the file
-// leaves out keeps its default while an explicit zero or false stays explicit.
-// A file that does not parse at all is ignored whole: partially applying a
-// file whose structure is broken is harder to explain than ignoring it.
+// maxConfigIncludes bounds a chain of `config_file` keys, so a file that
+// reaches itself through distinct paths still terminates.
+const maxConfigIncludes = 8
+
+// readConfig loads path and whatever it points at, then normalizes the merged
+// result once so a repaired value warns exactly once no matter which file set
+// it. Parse and unknown-key warnings name the file they came from; a repair
+// names no file because it describes the merged config, not one document.
 func readConfig(path string) (config, []string) {
-	cfg := defaultConfig()
+	cfg, warnings := readConfigFile(path, defaultConfig(), 0, make(map[string]bool))
+	return cfg, append(warnings, normalize(&cfg)...)
+}
+
+// readConfigFile decodes path over base. A `config_file` key names another
+// file: it is loaded first, then path is decoded again over it, so the file
+// carrying the key still wins for every value it sets itself. depth 0 is the
+// user's config file, where missing is normal; a missing target deeper in the
+// chain is a warning, because the user asked for it.
+func readConfigFile(path string, base config, depth int, seen map[string]bool) (config, []string) {
+	key := filepath.Clean(path)
+	if seen[key] {
+		return base, []string{fmt.Sprintf("%s: config_file includes itself", path)}
+	}
+	if depth > maxConfigIncludes {
+		return base, []string{fmt.Sprintf("%s: config_file nested more than %d deep", path, maxConfigIncludes)}
+	}
+	seen[key] = true
+	defer delete(seen, key)
+
+	cfg := base
 	md, err := toml.DecodeFile(path, &cfg)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return cfg, nil
+		if errors.Is(err, fs.ErrNotExist) && depth == 0 {
+			return base, nil
 		}
-		return defaultConfig(), []string{err.Error()}
+		return base, []string{fmt.Sprintf("%s: %v", path, err)}
 	}
 
 	var warnings []string
-	for _, key := range md.Undecoded() {
-		warnings = append(warnings, fmt.Sprintf("unknown key %q", key.String()))
+	for _, k := range md.Undecoded() {
+		warnings = append(warnings, fmt.Sprintf("%s: unknown key %q", path, k.String()))
 	}
-	return cfg, append(warnings, normalize(&cfg)...)
+
+	if inc := cfg.ConfigFile; inc != "" {
+		target := expandPath(inc)
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(path), target)
+		}
+		included, includedWarnings := readConfigFile(target, defaultConfig(), depth+1, seen)
+		warnings = append(warnings, includedWarnings...)
+		// path parsed once already, so the second decode cannot fail; it
+		// re-applies this file's own keys on top of the included settings.
+		cfg = included
+		_, _ = toml.DecodeFile(path, &cfg)
+	}
+
+	return cfg, warnings
 }
 
 // normalize repairs values that cannot reach go-gui/go-term intact, returning

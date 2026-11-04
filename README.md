@@ -67,6 +67,8 @@ logged and replaced by the default, so a typo never keeps the window from
 opening.
 
 ```toml
+config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
+
 [window]
 width      = 1000
 height     = 640
@@ -83,6 +85,14 @@ cursor_blink    = true
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: home; ~ and $VAR expand
 ```
+
+`config_file` lets a config live anywhere — a dotfiles repository, for
+instance — while the file at the path above stays a one-line pointer. The named
+file is loaded first and the file holding the key is applied on top, so the
+pointer's own values win if it sets any. A relative path resolves against the
+directory of the file that names it, and `~` and `$VAR` expand. A missing
+target, a cycle, or a chain more than 8 files deep is logged and skipped; the
+rest of the file still applies.
 
 `terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
 window runs, and the child is given the matching `SHELL`. Leave it empty to

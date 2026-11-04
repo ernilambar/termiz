@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -174,5 +175,107 @@ func TestConfigPath(t *testing.T) {
 	t.Setenv("HOME", "/home/termiz")
 	if got, err := configPath(); err != nil || got != "/home/termiz/.config/termiz/config.toml" {
 		t.Errorf("configPath() = %q, %v; want the ~/.config fallback", got, err)
+	}
+}
+
+// writeConfigAt writes body at path, creating the parent directories, so a test
+// can lay out an including file and its target side by side.
+func writeConfigAt(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadConfigFollowsConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	writeConfigAt(t, filepath.Join(dir, "sub", "included.toml"), "[font]\nsize = 20\n\n[window]\nwidth = 800\n")
+	path := filepath.Join(dir, "config.toml")
+	writeConfigAt(t, path, "config_file = \"sub/included.toml\"\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Font.Size != 20 || cfg.Window.Width != 800 {
+		t.Errorf("cfg = %+v, want the included font.size 20 and window.width 800", cfg)
+	}
+	if cfg.Terminal.ScrollbackRows != defaultScrollback {
+		t.Errorf("ScrollbackRows = %d, want the untouched default %d", cfg.Terminal.ScrollbackRows, defaultScrollback)
+	}
+}
+
+func TestReadConfigIncludingFileWins(t *testing.T) {
+	dir := t.TempDir()
+	writeConfigAt(t, filepath.Join(dir, "included.toml"), "[font]\nsize = 20\n")
+	path := filepath.Join(dir, "config.toml")
+	writeConfigAt(t, path, "config_file = \"included.toml\"\n\n[font]\nsize = 16\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Font.Size != 16 {
+		t.Errorf("Font.Size = %v, want the including file's 16", cfg.Font.Size)
+	}
+}
+
+func TestReadConfigExpandsConfigFilePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfigAt(t, filepath.Join(home, "dotfiles", "termiz.toml"), "[font]\nsize = 22\n")
+	path := filepath.Join(t.TempDir(), "config.toml")
+	writeConfigAt(t, path, "config_file = \"~/dotfiles/termiz.toml\"\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Font.Size != 22 {
+		t.Errorf("Font.Size = %v, want 22 from the expanded path", cfg.Font.Size)
+	}
+}
+
+func TestReadConfigWarnsOnMissingConfigFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	writeConfigAt(t, path, "config_file = \"missing.toml\"\n\n[font]\nsize = 18\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "missing.toml") {
+		t.Fatalf("warnings = %q, want one naming missing.toml", warnings)
+	}
+	if cfg.Font.Size != 18 {
+		t.Errorf("Font.Size = %v, want the including file's 18 to still apply", cfg.Font.Size)
+	}
+}
+
+func TestReadConfigStopsIncludeCycle(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.toml")
+	writeConfigAt(t, a, "config_file = \"b.toml\"\n")
+	writeConfigAt(t, filepath.Join(dir, "b.toml"), "config_file = \"a.toml\"\n\n[font]\nsize = 20\n")
+
+	cfg, warnings := readConfig(a)
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "includes itself") {
+		t.Fatalf("warnings = %q, want one about the cycle", warnings)
+	}
+	if cfg.Font.Size != 20 {
+		t.Errorf("Font.Size = %v, want 20 from b.toml", cfg.Font.Size)
+	}
+}
+
+func TestReadConfigStopsDeepIncludeChain(t *testing.T) {
+	dir := t.TempDir()
+	for i := range maxConfigIncludes + 2 {
+		writeConfigAt(t, filepath.Join(dir, fmt.Sprintf("config%d.toml", i)),
+			fmt.Sprintf("config_file = \"config%d.toml\"\n", i+1))
+	}
+
+	_, warnings := readConfig(filepath.Join(dir, "config0.toml"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "nested more than") {
+		t.Fatalf("warnings = %q, want one about the depth limit", warnings)
 	}
 }
