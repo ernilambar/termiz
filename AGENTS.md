@@ -19,8 +19,8 @@ go mod download
 No environment variables or secrets are needed. The app reads `$SHELL` at
 runtime; when it is unset the login shell is resolved from the OS. An optional
 config file at `$XDG_CONFIG_HOME/termiz/config.toml` (default
-`~/.config/termiz/config.toml`) sets the window, font and terminal values; see
-`config.go`.
+`~/.config/termiz/config.toml`) sets the window, font, theme and terminal
+values; see `config.go`.
 
 ## Commands
 
@@ -74,6 +74,12 @@ go build ./...
   name is spelled; the scripts and workflow read it from there. The release
   version comes from the git tag through `-version`; do not add a version to the
   manifest.
+- Theming goes through go-term's bundled corpus: `theme.name` is matched
+  case-insensitively by `theme.go`, the resolved theme is passed as
+  `Cfg.Themes[0]` so the spawned child's `COLORFGBG` agrees, and the go-gui
+  chrome is picked from `Theme.IsDark` (`chromeTheme`). A theme name the corpus
+  does not know is a warning and falls back to `Default`; never invent a
+  palette, and keep `termiz themes` the authoritative list.
 - Do not introduce external dependencies without updating `go.mod`/`go.sum`
   and checking that non-macOS builds remain cgo-free.
 

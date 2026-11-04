@@ -30,6 +30,9 @@ import (
 //	family = "Menlo"
 //	size   = 12
 //
+//	[theme]
+//	name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
+//
 //	[terminal]
 //	scrollback_rows = 10000
 //	cursor_blink    = true
@@ -51,6 +54,7 @@ type config struct {
 
 	Window   windowConfig   `toml:"window"`
 	Font     fontConfig     `toml:"font"`
+	Theme    themeConfig    `toml:"theme"`
 	Terminal terminalConfig `toml:"terminal"`
 }
 
@@ -69,6 +73,14 @@ type windowConfig struct {
 type fontConfig struct {
 	Family string  `toml:"family"`
 	Size   float64 `toml:"size"`
+}
+
+type themeConfig struct {
+	// Name selects a go-term bundled color theme, matched case-insensitively.
+	// Empty, or "Default", keeps go-term's built-in theme. The window chrome
+	// follows the theme's light/dark character, and `termiz themes` lists the
+	// valid names.
+	Name string `toml:"name"`
 }
 
 type terminalConfig struct {
@@ -257,6 +269,22 @@ func normalize(c *config) []string {
 			c.Terminal.Dir = ""
 		} else {
 			c.Terminal.Dir = dir
+		}
+	}
+
+	// An unknown name must not leave the window with a half-chosen palette:
+	// fall back to the built-in default and name the command that lists the
+	// valid spellings.
+	if c.Theme.Name != "" {
+		name, ok := canonicalThemeName(c.Theme.Name)
+		switch {
+		case !ok:
+			warn("theme.name %q is not a bundled theme; using %q (see `termiz themes`)", c.Theme.Name, themeNameDefault)
+			c.Theme.Name = ""
+		case name == themeNameDefault:
+			c.Theme.Name = ""
+		default:
+			c.Theme.Name = name
 		}
 	}
 

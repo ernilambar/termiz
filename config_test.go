@@ -116,6 +116,26 @@ func TestReadConfigIgnoresUnparseableFile(t *testing.T) {
 	}
 }
 
+func TestReadConfigCanonicalizesThemeName(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[theme]\nname = \"catppuccin mocha\"\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Theme.Name != "Catppuccin Mocha" {
+		t.Errorf("Theme.Name = %q, want the corpus spelling %q", cfg.Theme.Name, "Catppuccin Mocha")
+	}
+}
+
+func TestReadConfigRejectsUnknownTheme(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[theme]\nname = \"No Such Theme\"\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "theme.name") {
+		t.Fatalf("warnings = %q, want one about theme.name", warnings)
+	}
+	if cfg.Theme.Name != "" {
+		t.Errorf("Theme.Name = %q, want empty so the default theme is used", cfg.Theme.Name)
+	}
+}
+
 func TestReadConfigResolvesDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

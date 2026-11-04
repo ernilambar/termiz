@@ -4,7 +4,8 @@
 
 A minimal, GPU-accelerated terminal emulator for macOS. It gives you a real
 shell on a PTY in a small native window — no browser engine, no tabs, no panes,
-and one optional file to change the window, the font and the terminal.
+and one optional file to change the window, the font, the theme and the
+terminal.
 
 ## Install
 
@@ -51,6 +52,7 @@ carries informational commands:
 ```bash
 termiz --help      # or -h, or `help`
 termiz --version   # or -V, or `version`
+termiz themes      # list the bundled color themes
 ```
 
 Run them as `./termiz …` to use the repository build instead. The version
@@ -80,6 +82,9 @@ min_height = 240
 family = "Menlo"
 size   = 12          # 6–72
 
+[theme]
+name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
+
 [terminal]
 scrollback_rows = 10000  # 0: go-term's 5000 rows, negative: no scrollback
 cursor_blink    = true
@@ -104,7 +109,17 @@ rest of the file still applies.
 window runs, and the child is given the matching `SHELL`. Leave it empty to
 keep the `$SHELL` → OS login shell resolution.
 
-Theme selection is a later phase.
+`theme.name` selects one of the 602 color themes go-term bundles (the
+iTerm2-Color-Schemes corpus), matched case-insensitively so `catppuccin mocha`
+and `Catppuccin Mocha` are the same theme; `termiz themes` prints the valid
+names, `Default` first. Empty, or `Default`, keeps go-term's built-in dark
+theme. The window chrome follows the chosen theme's light or dark character, so
+a light theme gets a light title bar and focus ring. An unknown name is logged
+and the default theme is used; there is no fallback to a half-applied palette.
+
+```bash
+termiz themes | grep -i catppuccin
+```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
 checks a change must pass.

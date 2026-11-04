@@ -46,6 +46,11 @@ func main() {
 		case "-V", "--version", "version":
 			fmt.Printf("termiz %s\n", version)
 			return
+		case "themes":
+			for _, name := range themeNames() {
+				fmt.Println(name)
+			}
+			return
 		default:
 			fmt.Fprintf(os.Stderr, "termiz: unknown argument %q\n\n", arg)
 			usage(os.Stderr)
@@ -64,6 +69,7 @@ func usage(w io.Writer) {
 Commands:
   help       print this help and exit
   version    print the version and exit
+  themes     list the bundled color themes
 
 Flags:
   -h, --help     print this help and exit
@@ -76,6 +82,15 @@ With no command, termiz opens a native window running the login shell on a PTY.
 func launch() {
 	cfg := loadConfig()
 	command, env := shellSpec(cfg)
+	theme, ok := lookupTheme(cfg.Theme.Name)
+	if !ok {
+		// normalize already warned; keep the window usable.
+		theme = term.DefaultTheme
+	}
+	themeName := cfg.Theme.Name
+	if themeName == "" {
+		themeName = themeNameDefault
+	}
 
 	// A GUI launch (Finder, app bundle) inherits "/" as its working directory,
 	// so letting the child inherit it would open the shell at the filesystem
@@ -114,7 +129,10 @@ func launch() {
 				Command:         command,
 				Env:             env,
 				Dir:             dir,
-				OnExit:          w.Close,
+				// The first entry seeds the grid and the COLORFGBG the child
+				// is spawned with; after that the grid is the source of truth.
+				Themes: []term.NamedTheme{{Name: themeName, Theme: theme}},
+				OnExit: w.Close,
 			})
 			if err != nil {
 				log.Printf("term.New: %v", err)
@@ -130,7 +148,7 @@ func launch() {
 		}
 	}()
 
-	gui.SetTheme(gui.ThemeDark.WithBorders(true))
+	gui.SetTheme(chromeTheme(theme))
 	backend.Run(w)
 }
 
