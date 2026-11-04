@@ -20,6 +20,7 @@ import (
 //	config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
 //
 //	[window]
+//	maximize   = true   # fill the screen's visible area on launch
 //	width      = 1000
 //	height     = 640
 //	min_width  = 400
@@ -54,10 +55,15 @@ type config struct {
 }
 
 type windowConfig struct {
-	Width     int `toml:"width"`
-	Height    int `toml:"height"`
-	MinWidth  int `toml:"min_width"`
-	MinHeight int `toml:"min_height"`
+	// Maximize opens the window filling the screen's visible area, the same
+	// operation as the Window > Zoom menu item. Set false to open at
+	// Width×Height instead. Ignored where AppKit is unavailable (Linux,
+	// Windows, cgo-free builds), which keep the configured size.
+	Maximize  bool `toml:"maximize"`
+	Width     int  `toml:"width"`
+	Height    int  `toml:"height"`
+	MinWidth  int  `toml:"min_width"`
+	MinHeight int  `toml:"min_height"`
 }
 
 type fontConfig struct {
@@ -93,6 +99,7 @@ const (
 func defaultConfig() config {
 	return config{
 		Window: windowConfig{
+			Maximize:  true,
 			Width:     defaultWidth,
 			Height:    defaultHeight,
 			MinWidth:  defaultMinWidth,

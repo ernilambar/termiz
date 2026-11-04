@@ -100,6 +100,10 @@ func launch() {
 		MinWidth:  cfg.Window.MinWidth,
 		MinHeight: cfg.Window.MinHeight,
 		OnInit: func(w *gui.Window) {
+			if cfg.Window.Maximize {
+				maximizeWindow()
+			}
+
 			var err error
 			tm, err = term.New(w, term.Cfg{
 				TextStyle:       gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)},

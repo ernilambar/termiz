@@ -70,6 +70,7 @@ opening.
 config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
 
 [window]
+maximize   = true   # fill the screen's visible area on launch
 width      = 1000
 height     = 640
 min_width  = 400
@@ -85,6 +86,11 @@ cursor_blink    = true
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: home; ~ and $VAR expand
 ```
+
+`window.maximize`, on by default, opens the window filling the screen's
+visible area — the same as the Window > Zoom menu item. Set it to `false` to
+open at `width`×`height` instead. It is macOS-only: a Linux or Windows build,
+or a cgo-free Darwin build, keeps the configured size.
 
 `config_file` lets a config live anywhere — a dotfiles repository, for
 instance — while the file at the path above stays a one-line pointer. The named

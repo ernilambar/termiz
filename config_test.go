@@ -44,12 +44,18 @@ func TestReadConfigAppliesFileOverDefaults(t *testing.T) {
 	if !cfg.Terminal.CursorBlink {
 		t.Error("Terminal.CursorBlink = false, want untouched default true")
 	}
+	if !cfg.Window.Maximize {
+		t.Error("Window.Maximize = false, want untouched default true")
+	}
 }
 
 func TestReadConfigKeepsExplicitZeroValues(t *testing.T) {
-	cfg, warnings := readConfig(writeConfig(t, "[terminal]\ncursor_blink = false\nscrollback_rows = 0\n"))
+	cfg, warnings := readConfig(writeConfig(t, "[window]\nmaximize = false\n\n[terminal]\ncursor_blink = false\nscrollback_rows = 0\n"))
 	if len(warnings) != 0 {
 		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Window.Maximize {
+		t.Error("Window.Maximize = true, want explicit false")
 	}
 	if cfg.Terminal.CursorBlink {
 		t.Error("Terminal.CursorBlink = true, want explicit false")

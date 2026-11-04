@@ -57,6 +57,11 @@ go build ./...
   `~/.config`: the including file is decoded on top, a relative target resolves
   against the including file's directory, and a missing target, a cycle or a
   chain deeper than `maxConfigIncludes` is a warning, not an error.
+- Window maximization is macOS-only and lives behind `maximizeWindow`
+  (`window_darwin.go`, cgo; `window_other.go` is the stub): go-gui exposes no
+  maximize or fullscreen call, so the Darwin build zooms the AppKit key window
+  in `OnInit`, and every other target keeps the configured size. Keep the two
+  files in step, and never let the stub need cgo.
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
   the `defer` in `main`, so closing the window tears down the PTY.
