@@ -1,0 +1,28 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab
+# gofmt aligns with tabs at 8 columns; do not narrow this for Go sources.
+tab_width = 8
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.sh]
+indent_style = space
+indent_size = 4
+
+[*.md]
+indent_style = space
+indent_size = 4
+# Markdown hard line breaks are two trailing spaces.
+trim_trailing_whitespace = false
+
+[*.toml]
+indent_style = space
+indent_size = 2
