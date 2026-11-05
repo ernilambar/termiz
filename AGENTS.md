@@ -49,7 +49,7 @@ go build ./...
   add platform branches without a matching `runtime.GOOS` guard. A
   `terminal.shell` in the config file outranks `$SHELL` by design; that
   precedence lives in `shellSpec`, not in `loginShell`.
-- Configuration is read by the loader, never written. `defaultConfig` in
+- Configuration is read by the loader, never written with values. `defaultConfig` in
   `config.go` is the only place the built-in values live, and `launch` takes
   every window and terminal value from the loaded struct instead of a literal.
   Loading is forgiving on purpose: a missing file means defaults, and a
@@ -69,8 +69,9 @@ go build ./...
   native menubar needs App mode (`gui.NewApp` + `backend.RunApp`): only a
   registered App owns one. `open(1)` does not inherit the caller's environment,
   so the `dev.sh` CLI shim forwards `VISUAL` and `EDITOR`. The action creates
-  the config directory and, for the system-editor fallback only, an empty
-  config file (TextEdit refuses a missing path); it never changes values.
+  the config directory and seeds a missing file with `configHeader`, a comment
+  that links `docs/config.md` and sets no value (the system editor also needs
+  the path to exist); an existing file is never touched.
 - Window maximization is macOS-only and lives behind `maximizeWindow`
   (`window_darwin.go`, cgo; `window_other.go` is the stub): go-gui exposes no
   maximize or fullscreen call, so the Darwin build zooms the AppKit key window

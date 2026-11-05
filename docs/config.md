@@ -207,9 +207,9 @@ on its own still leaves the last directory. Naming `terminal.dir` pins the
 start directory and stops the state write entirely.
 
 `Termiz > Settings` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
-the system text editor. It creates the config directory when missing — and,
-for the system-editor fallback only, an empty config file, because TextEdit
-refuses a missing path. It never changes any value.
+the system text editor. It creates the config directory when missing and seeds
+a missing file with a comment pointing at this reference page — the system
+editor also needs the path to exist. It never changes any value.
 
 ## Verifying a config
 

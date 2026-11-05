@@ -125,8 +125,9 @@ rest of the file still applies.
 
 `Termiz > Settings` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
 this file with it; when neither is set the default text editor opens it. The
-directory is created when missing. The app never rewrites settings, so the
-editor is the one that changes the contents.
+directory is created when missing, and a missing file is created with a comment
+pointing at `docs/config.md`. The app never writes a setting, so the editor is
+the one that changes the contents.
 
 `terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
 window runs, and the child is given the matching `SHELL`. Leave it empty to

@@ -95,6 +95,13 @@ func TestOpenConfigInEditorEditorPrecedence(t *testing.T) {
 			if _, err := os.Stat(filepath.Dir(wantPath)); err != nil {
 				t.Errorf("config directory not created: %v", err)
 			}
+			seeded, err := os.ReadFile(wantPath)
+			if err != nil {
+				t.Fatalf("missing config was not seeded: %v", err)
+			}
+			if string(seeded) != configHeader {
+				t.Errorf("seeded config = %q, want %q", seeded, configHeader)
+			}
 		})
 	}
 }
@@ -136,5 +143,42 @@ func TestOpenConfigInEditorFallsBackToTextEditor(t *testing.T) {
 	}
 	if _, err := os.Stat(want); err != nil {
 		t.Errorf("config file not created: %v", err)
+	}
+}
+
+// TestSeedConfig pins the two properties that make seeding safe: a missing
+// file is created carrying the reference header, and an existing file is
+// never rewritten.
+func TestSeedConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	if err := seedConfig(path); err != nil {
+		t.Fatalf("seedConfig: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != configHeader {
+		t.Errorf("seeded content = %q, want %q", got, configHeader)
+	}
+	if !strings.Contains(string(got), configDocsURL) {
+		t.Errorf("seeded content %q does not name the reference URL", got)
+	}
+
+	existing := "font = { size = 14 }\n"
+	if err := os.WriteFile(path, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := seedConfig(path); err != nil {
+		t.Fatalf("seedConfig on existing file: %v", err)
+	}
+	got, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != existing {
+		t.Errorf("existing content = %q, want %q untouched", got, existing)
 	}
 }
