@@ -86,6 +86,26 @@ func TestReadConfigRepairsOutOfRangeValues(t *testing.T) {
 	}
 }
 
+func TestReadConfigWindowPadding(t *testing.T) {
+	// 0 is a real choice, not a missing value: the file must be able to ask
+	// for a flush grid.
+	cfg, warnings := readConfig(writeConfig(t, "[window]\npadding = 0\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none for padding 0", warnings)
+	}
+	if cfg.Window.Padding != 0 {
+		t.Errorf("Window.Padding = %d, want the explicit 0", cfg.Window.Padding)
+	}
+
+	cfg, warnings = readConfig(writeConfig(t, "[window]\npadding = 500\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "window.padding") {
+		t.Fatalf("warnings = %q, want one naming window.padding", warnings)
+	}
+	if cfg.Window.Padding != defaultPadding {
+		t.Errorf("Window.Padding = %d, want the repaired default %d", cfg.Window.Padding, defaultPadding)
+	}
+}
+
 func TestReadConfigClampsMinimumToOpeningSize(t *testing.T) {
 	cfg, warnings := readConfig(writeConfig(t, "[window]\nwidth = 300\n"))
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "min_width") {

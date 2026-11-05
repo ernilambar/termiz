@@ -78,6 +78,7 @@ width      = 1000
 height     = 640
 min_width  = 400
 min_height = 240
+padding    = 8       # 0–64; inset from the window edge to the terminal
 
 [font]
 family = "Menlo"
@@ -97,6 +98,12 @@ dir             = ""     # empty: last session's directory, then home
 visible area — the same as the Window > Zoom menu item. Set it to `false` to
 open at `width`×`height` instead. It is macOS-only: a Linux or Windows build,
 or a cgo-free Darwin build, keeps the configured size.
+
+`window.padding` is the inset, in points, between the window edge and the
+terminal, and defaults to `8`. The terminal keeps a 4 px inset of its own
+inside it, so text starts `padding + 4` points from each edge; `0` is allowed
+and leaves only that inner inset. Values outside `0`–`64` are logged and
+replaced by `8`.
 
 `config_file` lets a config live anywhere — a dotfiles repository, for
 instance — while the file at the path above stays a one-line pointer. The named

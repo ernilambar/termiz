@@ -29,6 +29,7 @@ width      = 1000
 height     = 640
 min_width  = 400
 min_height = 240
+padding    = 8       # 0–64; inset from the window edge to the terminal
 
 [font]
 family = "Menlo"
@@ -61,6 +62,12 @@ dir             = ""     # empty: last session's directory, then home
 | `height` | int | `640` | Initial window height in points; must be positive. |
 | `min_width` | int | `400` | Minimum width the user can resize to; must be positive. |
 | `min_height` | int | `240` | Minimum height the user can resize to; must be positive. |
+| `padding` | int | `8` | Inset in points from the window edge to the terminal; `0`–`64`. |
+
+`padding` gives the grid breathing room and keeps the first column clear of
+the window's rounded corners. `0` is allowed and leaves the grid at the
+widget's own 4 px inset; the text therefore starts `padding + 4` points from
+each edge. A negative or larger-than-`64` value is logged and replaced by `8`.
 
 `maximize` is macOS-only. A Linux or Windows build, or a cgo-free Darwin
 build, has no AppKit window to zoom and keeps the configured size.

@@ -148,7 +148,7 @@ func launch() {
 				w.Close()
 				return
 			}
-			w.SetView(tm.View)
+			w.SetView(paddedView(tm, cfg.Window.Padding, theme.DefaultBG))
 			stopDirWatch = watchDir(tm, cfg)
 		},
 	})
@@ -166,6 +166,29 @@ func launch() {
 
 	gui.SetTheme(chromeTheme(theme))
 	backend.RunApp(app, w)
+}
+
+// paddedView wraps the terminal in an outer container so window.padding is a
+// real inset from the window edge. The wrapper paints its band with the
+// terminal's background, matching what go-term already does for its own 4 px
+// inset, so the two bands read as one. A zero padding returns the terminal's
+// own view unchanged: no extra container, no extra band.
+//
+// The wrapper must stay a plain Column: go-term expects to be the only
+// focusable node, and it asserts the window focus itself inside Term.View.
+func paddedView(tm *term.Term, pad int, bg gui.Color) func(*gui.Window) gui.View {
+	if pad <= 0 {
+		return tm.View
+	}
+	inset := float32(pad)
+	return func(w *gui.Window) gui.View {
+		return gui.Column(gui.ContainerCfg{
+			Sizing:  gui.FillFill,
+			Padding: gui.PadAll(inset),
+			Color:   bg,
+			Content: []gui.View{tm.View(w)},
+		})
+	}
 }
 
 // loginShell resolves the user's shell. $SHELL is authoritative when set; a

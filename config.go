@@ -25,6 +25,7 @@ import (
 //	height     = 640
 //	min_width  = 400
 //	min_height = 240
+//	padding    = 8      # inset between the window edge and the terminal
 //
 //	[font]
 //	family = "Menlo"
@@ -68,6 +69,11 @@ type windowConfig struct {
 	Height    int  `toml:"height"`
 	MinWidth  int  `toml:"min_width"`
 	MinHeight int  `toml:"min_height"`
+	// Padding is the inset, in points, between the window edge and the
+	// terminal widget, so text does not sit flush against the chrome. The
+	// widget keeps a 4 px inset of its own inside that, so the first column
+	// starts Padding+4 from the edge. 0 keeps only the widget's own inset.
+	Padding int `toml:"padding"`
 }
 
 type fontConfig struct {
@@ -105,6 +111,10 @@ const (
 	defaultFontFamily = "Menlo"
 	defaultFontSize   = 12
 	defaultScrollback = 10000
+	// The window's inset from its edge to the terminal. Zero is allowed and
+	// meaningful; the ceiling keeps a typo from shrinking the grid to nothing.
+	defaultPadding = 8
+	maxPadding     = 64
 	// The usable font range: below it text is unreadable, above it a cell no
 	// longer fits the 24x80 grid the PTY starts with.
 	minFontSize = 6
@@ -119,6 +129,7 @@ func defaultConfig() config {
 			Height:    defaultHeight,
 			MinWidth:  defaultMinWidth,
 			MinHeight: defaultMinHeight,
+			Padding:   defaultPadding,
 		},
 		Font: fontConfig{
 			Family: defaultFontFamily,
@@ -255,6 +266,12 @@ func normalize(c *config) []string {
 	if w.MinHeight > w.Height {
 		warn("window.min_height %d exceeds window.height; using %d", w.MinHeight, w.Height)
 		w.MinHeight = w.Height
+	}
+	// 0 is a valid choice (flush grid), so only the range outside
+	// [0, maxPadding] is a repair.
+	if w.Padding < 0 || w.Padding > maxPadding {
+		warn("window.padding must be between 0 and %d; using %d", maxPadding, defaultPadding)
+		w.Padding = defaultPadding
 	}
 
 	if c.Font.Family == "" {
