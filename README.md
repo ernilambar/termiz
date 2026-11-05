@@ -124,8 +124,8 @@ target, a cycle, or a chain more than 8 files deep is logged and skipped; the
 rest of the file still applies.
 
 `Termiz > Settings…` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
-this file with it, looked up in your login shell's `PATH` so `code -w` or
-`subl -w` work from a Dock launch. When neither is set, the command is not
+this file with it, looked up in your shell's `PATH` (`~/.zprofile` and
+`~/.zshrc` both count) so `code -w` or `subl -w` work from a Dock launch. When neither is set, the command is not
 found, or it is a terminal editor such as vim or nano, the default text editor
 opens it. The
 directory is created when missing, and a missing file is created with a comment

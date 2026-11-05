@@ -60,8 +60,9 @@ go build ./...
   unknown key, a wrong-typed value or an out-of-range value is logged and
   replaced by its default rather than failing startup; `applyKeys` decodes one
   key at a time so a bad value costs only that key. A file with a syntax error
-  is ignored whole. `terminal.shell` is resolved with `exec.LookPath` and a
-  missing shell falls back to the login shell.
+  is ignored whole. `terminal.shell` is resolved with `exec.LookPath`, then a
+  bare name in `loginPATH` (`resolveShell`); a missing shell falls back to the
+  login shell.
   `config_file` loads another file as the base, so settings can live outside
   `~/.config`: the including file is decoded on top, a relative target resolves
   against the including file's directory, and a missing target, a cycle or a
@@ -69,9 +70,13 @@ go build ./...
 - `Termiz > Settings` (`menu.go`) opens the config in `$VISUAL`,
   then `$EDITOR`, and otherwise in the system text editor. A terminal editor
   (`isTerminalEditor`) counts as unset because the app has no TTY to give it.
-  The editor runs with the login shell's PATH (`loginPATH`, `userpath.go`),
-  since launchd's PATH misses editor CLIs; a command that still does not
-  resolve falls back to the text editor. The action runs off the main thread.
+  The editor runs with the PATH of the terminal's shell (`loginPATH`,
+  `userpath.go`: one `-i -l -c` probe, marker-delimited output, `WaitDelay` so
+  a daemon started by a profile cannot stall it), since launchd's PATH misses
+  editor CLIs. `commandResolves` lets `sh` parse the command, so quoted paths
+  work; one that still does not resolve falls back to the text editor. The
+  action runs off the main thread. Tests replace `loginPATH` and never run the
+  developer's shell.
   The item belongs in
   the app menu, but go-gui's native app menu has no slot for app-defined items:
   `installMenubar` declares a throwaway top-level menu and

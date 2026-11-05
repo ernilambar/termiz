@@ -45,5 +45,7 @@ func openLog() {
 		return
 	}
 	// The file stays open for the life of the process; the OS closes it.
-	log.SetOutput(io.MultiWriter(os.Stderr, f))
+	// File first: MultiWriter stops at the first failing writer, and a
+	// launch with fd 2 closed must still reach the file.
+	log.SetOutput(io.MultiWriter(f, os.Stderr))
 }

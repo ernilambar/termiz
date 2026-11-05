@@ -126,8 +126,9 @@ application can still change the shape, as vim does for insert mode. Setting
 shape and blink hold for the whole session.
 
 `shell` is the program to run. `~` and `$VAR` expand, and a bare name is
-looked up in `PATH` — but a Dock or Finder launch has launchd's minimal `PATH`,
-so use an absolute path to be unambiguous. A shell that cannot be found is
+looked up in `PATH`, then — because a Dock or Finder launch has launchd's
+minimal `PATH` — in the `PATH` your login shell builds. An absolute path skips
+both lookups. A shell that cannot be found is
 logged and the login-shell resolution below applies instead. A known shell
 (sh, bash, zsh, fish, dash, ksh, mksh, tcsh, csh, nu, xonsh) starts as a login
 shell (`-l`), as Terminal.app does, so `~/.zprofile` runs; any other shell is
@@ -212,9 +213,11 @@ on its own still leaves the last directory. Naming `terminal.dir` pins the
 start directory and stops the state write entirely.
 
 `Termiz > Settings…` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
-the system text editor. The editor command is looked up in the login shell's
-`PATH`, because a Dock launch's own `PATH` misses Homebrew and editor CLIs; a
-command that is still not found, or a terminal editor (vim, nvim, nano, emacs,
+the system text editor. The editor command is looked up in the `PATH` the
+terminal's shell builds as an interactive login shell (so `~/.zshrc` counts),
+because a Dock launch's own `PATH` misses Homebrew and editor CLIs. Quoting is
+honored, so `"/Applications/Sublime Text.app/…/subl" -w` works; a command that
+is still not found, or a terminal editor (vim, nvim, nano, emacs,
 …), falls back to the system text editor. It creates the config directory when
 missing and seeds
 a missing file with a comment pointing at this reference page — the system

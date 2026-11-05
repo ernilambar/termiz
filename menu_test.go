@@ -22,6 +22,15 @@ func stubEditor(t *testing.T, dir, name, capture string) string {
 	return path
 }
 
+// useProcessPATH stands in for loginPATH so the editor tests never run the
+// developer's own login shell.
+func useProcessPATH(t *testing.T) {
+	t.Helper()
+	orig := loginPATH
+	loginPATH = func() string { return os.Getenv("PATH") }
+	t.Cleanup(func() { loginPATH = orig })
+}
+
 // waitForEditorArgs waits for the stub to run and returns its argv.
 func waitForEditorArgs(t *testing.T, capture string) []string {
 	t.Helper()
@@ -40,6 +49,7 @@ func waitForEditorArgs(t *testing.T, capture string) []string {
 // outranks $EDITOR, a blank value counts as unset, and the path handed to the
 // editor is the primary config path with its directory created.
 func TestOpenConfigInEditorEditorPrecedence(t *testing.T) {
+	useProcessPATH(t)
 	for _, tc := range []struct {
 		name        string
 		visualSet   bool
@@ -105,6 +115,7 @@ func TestOpenConfigInEditorEditorPrecedence(t *testing.T) {
 // the macOS default text editor is launched with -t, and the config file is
 // created first because TextEdit refuses a path that does not exist.
 func TestOpenConfigInEditorFallsBackToTextEditor(t *testing.T) {
+	useProcessPATH(t)
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
 	t.Setenv("VISUAL", "")
@@ -178,6 +189,7 @@ func TestSeedConfig(t *testing.T) {
 // login PATH cannot find opens the system text editor instead of failing
 // silently in sh.
 func TestOpenConfigInEditorUnresolvedEditorFallsBack(t *testing.T) {
+	useProcessPATH(t)
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
 	t.Setenv("VISUAL", "")

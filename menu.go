@@ -98,12 +98,10 @@ func openConfigInEditor() error {
 	}
 	env := os.Environ()
 	if editor != "" {
-		pathList := os.Getenv("PATH")
 		if p := loginPATH(); p != "" {
-			pathList = p
 			env = withPATH(env, p)
 		}
-		if _, ok := lookPathIn(strings.Fields(editor)[0], pathList); !ok {
+		if !commandResolves(editor, env) {
 			log.Printf("settings: %q is not on PATH; using the system text editor", editor)
 			editor = ""
 		}

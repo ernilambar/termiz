@@ -286,7 +286,7 @@ func decodeKey(path, name string, one map[string]any, cfg *config) []string {
 	next := *cfg
 	md, err := toml.Decode(buf.String(), &next)
 	if err != nil {
-		return []string{fmt.Sprintf("%s: %s has the wrong type; using the default", path, name)}
+		return []string{fmt.Sprintf("%s: %s has the wrong type; ignored", path, name)}
 	}
 	var warnings []string
 	for _, k := range md.Undecoded() {
@@ -383,14 +383,14 @@ func normalize(c *config) []string {
 
 	// A shell that cannot be found would make the window close the moment it
 	// opens, so it is checked here and the login shell used instead. A bare
-	// name resolves against this process's PATH, which for a Finder launch is
-	// launchd's minimal one, so an absolute path is the reliable spelling.
+	// name missing from this process's PATH, which for a Finder launch is
+	// launchd's minimal one, is looked up in the login shell's PATH.
 	if c.Terminal.Shell != "" {
-		if sh, err := exec.LookPath(expandPath(c.Terminal.Shell)); err != nil {
+		if sh, ok := resolveShell(expandPath(c.Terminal.Shell)); ok {
+			c.Terminal.Shell = sh
+		} else {
 			warn("terminal.shell %q is not an executable; using the login shell", c.Terminal.Shell)
 			c.Terminal.Shell = ""
-		} else {
-			c.Terminal.Shell = sh
 		}
 	}
 
@@ -411,6 +411,18 @@ func normalize(c *config) []string {
 	}
 
 	return warnings
+}
+
+// resolveShell finds the configured shell: as written, then (for a bare name
+// only) in the login shell's PATH.
+func resolveShell(name string) (string, bool) {
+	if sh, err := exec.LookPath(name); err == nil {
+		return sh, true
+	}
+	if strings.Contains(name, "/") {
+		return "", false
+	}
+	return lookPathIn(name, loginPATH())
 }
 
 // cursorStyleName canonicalizes a terminal.cursor_style value. "beam" is
