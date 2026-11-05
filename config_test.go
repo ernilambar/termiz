@@ -86,6 +86,40 @@ func TestReadConfigRepairsOutOfRangeValues(t *testing.T) {
 	}
 }
 
+func TestReadConfigCursor(t *testing.T) {
+	// Canonical spellings, case-insensitive, with "beam" as the alias for
+	// "bar" that go-term's own config accepts.
+	for _, tc := range []struct{ in, want string }{
+		{"block", "block"},
+		{"Underline", "underline"},
+		{"BAR", "bar"},
+		{"beam", "bar"},
+		{"", "block"},
+	} {
+		cfg, warnings := readConfig(writeConfig(t, fmt.Sprintf("[terminal]\ncursor_style = %q\n", tc.in)))
+		if len(warnings) != 0 {
+			t.Fatalf("cursor_style %q: warnings = %q, want none", tc.in, warnings)
+		}
+		if cfg.Terminal.CursorStyle != tc.want {
+			t.Errorf("cursor_style %q = %q, want %q", tc.in, cfg.Terminal.CursorStyle, tc.want)
+		}
+	}
+
+	cfg, warnings := readConfig(writeConfig(t, "[terminal]\ncursor_style = \"box\"\ncursor_blink = false\ncursor_lock = true\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "terminal.cursor_style") {
+		t.Fatalf("warnings = %q, want one naming terminal.cursor_style", warnings)
+	}
+	if cfg.Terminal.CursorStyle != defaultCursorStyle {
+		t.Errorf("Terminal.CursorStyle = %q, want the repaired default %q", cfg.Terminal.CursorStyle, defaultCursorStyle)
+	}
+	if cfg.Terminal.CursorBlink {
+		t.Error("Terminal.CursorBlink = true, want explicit false")
+	}
+	if !cfg.Terminal.CursorLock {
+		t.Error("Terminal.CursorLock = false, want explicit true")
+	}
+}
+
 func TestReadConfigWindowPadding(t *testing.T) {
 	// 0 is a real choice, not a missing value: the file must be able to ask
 	// for a flush grid.

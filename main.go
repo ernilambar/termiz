@@ -132,7 +132,9 @@ func launch() {
 			tm, err = term.New(w, term.Cfg{
 				TextStyle:       gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)},
 				ScrollbackRows:  cfg.Terminal.ScrollbackRows,
+				CursorStyle:     cursorStyle(cfg.Terminal.CursorStyle),
 				CursorBlink:     cfg.Terminal.CursorBlink,
+				CursorLocked:    cfg.Terminal.CursorLock,
 				Identity:        "termiz",
 				IdentityVersion: version,
 				Command:         command,
@@ -166,6 +168,20 @@ func launch() {
 
 	gui.SetTheme(chromeTheme(theme))
 	backend.RunApp(app, w)
+}
+
+// cursorStyle maps a normalized terminal.cursor_style value to go-term's
+// type. normalize already limited the value to the three known spellings, so
+// anything else here is the block default.
+func cursorStyle(name string) term.CursorStyle {
+	switch name {
+	case "underline":
+		return term.CursorStyleUnderline
+	case "bar":
+		return term.CursorStyleBar
+	default:
+		return term.CursorStyleBlock
+	}
 }
 
 // paddedView wraps the terminal in an outer container so window.padding is a

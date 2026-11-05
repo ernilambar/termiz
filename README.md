@@ -89,10 +89,20 @@ name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
 
 [terminal]
 scrollback_rows = 10000  # 0: go-term's 5000 rows, negative: no scrollback
+cursor_style    = "block"  # block, underline or bar
 cursor_blink    = true
+cursor_lock     = false  # ignore a child's cursor-shape requests
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: last session's directory, then home
 ```
+
+The cursor keys select the shape the window starts with — `block`,
+`underline`, or `bar` (case-insensitive, and `beam` is accepted for `bar`) —
+whether it blinks, and whether the window obeys the child's own cursor
+requests. With `cursor_lock` off, which is the default, an editor can switch
+to a bar for insert mode (vim does); setting it to `true` pins the configured
+shape and blink for the life of the window. `reset` returns to the configured
+cursor either way. An unknown style is logged and replaced by `block`.
 
 `window.maximize`, on by default, opens the window filling the screen's
 visible area — the same as the Window > Zoom menu item. Set it to `false` to

@@ -36,7 +36,9 @@ import (
 //
 //	[terminal]
 //	scrollback_rows = 10000
+//	cursor_style    = "block"  # block, underline or bar
 //	cursor_blink    = true
+//	cursor_lock     = false    # ignore a child's DECSCUSR
 //	shell           = ""   # empty: $SHELL, then the OS login shell
 //	dir             = ""   # empty: last session's directory, then home
 //
@@ -93,9 +95,21 @@ type terminalConfig struct {
 	// ScrollbackRows follows go-term's convention: zero means go-term's own
 	// default (5000 rows), a positive value caps history, a negative value
 	// disables it.
-	ScrollbackRows int    `toml:"scrollback_rows"`
-	CursorBlink    bool   `toml:"cursor_blink"`
-	Shell          string `toml:"shell"`
+	ScrollbackRows int `toml:"scrollback_rows"`
+	// CursorStyle is the shape the cursor starts in and the one `reset`
+	// returns to: "block", "underline" or "bar". It is a default, not an
+	// override, so an editor can still switch to a bar for insert mode
+	// unless CursorLock is set.
+	CursorStyle string `toml:"cursor_style"`
+	// CursorBlink is whether the cursor blinks, with the same
+	// default-not-override meaning as CursorStyle.
+	CursorBlink bool `toml:"cursor_blink"`
+	// CursorLock ignores every cursor-shape request the child sends
+	// (DECSCUSR, CSI Ps SP q), pinning CursorStyle and CursorBlink for the
+	// life of the window. Off by default: vim and friends legitimately move
+	// the cursor, and silently dropping those requests would surprise them.
+	CursorLock bool   `toml:"cursor_lock"`
+	Shell      string `toml:"shell"`
 	// Dir is the shell's starting directory; ~ and $VAR expand. Empty restores
 	// the directory the previous session ended in (see state.go), falling back
 	// to the home directory when there is none or it no longer exists.
@@ -104,13 +118,14 @@ type terminalConfig struct {
 
 // Defaults are the values the app has always started with.
 const (
-	defaultWidth      = 1000
-	defaultHeight     = 640
-	defaultMinWidth   = 400
-	defaultMinHeight  = 240
-	defaultFontFamily = "Menlo"
-	defaultFontSize   = 12
-	defaultScrollback = 10000
+	defaultWidth       = 1000
+	defaultHeight      = 640
+	defaultMinWidth    = 400
+	defaultMinHeight   = 240
+	defaultFontFamily  = "Menlo"
+	defaultFontSize    = 12
+	defaultScrollback  = 10000
+	defaultCursorStyle = "block"
 	// The window's inset from its edge to the terminal. Zero is allowed and
 	// meaningful; the ceiling keeps a typo from shrinking the grid to nothing.
 	defaultPadding = 8
@@ -137,6 +152,7 @@ func defaultConfig() config {
 		},
 		Terminal: terminalConfig{
 			ScrollbackRows: defaultScrollback,
+			CursorStyle:    defaultCursorStyle,
 			CursorBlink:    true,
 		},
 	}
@@ -282,6 +298,13 @@ func normalize(c *config) []string {
 		c.Font.Size = defaultFontSize
 	}
 
+	if name, ok := cursorStyleName(c.Terminal.CursorStyle); !ok {
+		warn("terminal.cursor_style %q must be block, underline or bar; using %q", c.Terminal.CursorStyle, defaultCursorStyle)
+		c.Terminal.CursorStyle = defaultCursorStyle
+	} else {
+		c.Terminal.CursorStyle = name
+	}
+
 	if c.Terminal.Dir != "" {
 		dir := expandPath(c.Terminal.Dir)
 		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
@@ -309,6 +332,22 @@ func normalize(c *config) []string {
 	}
 
 	return warnings
+}
+
+// cursorStyleName canonicalizes a terminal.cursor_style value. "beam" is
+// accepted as a synonym for "bar", matching go-term's own config parser, and
+// empty quietly keeps the default, as font.family does.
+func cursorStyleName(s string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "block":
+		return "block", true
+	case "underline":
+		return "underline", true
+	case "bar", "beam":
+		return "bar", true
+	default:
+		return "", false
+	}
 }
 
 // expandPath turns a leading ~ into the home directory and expands $VAR

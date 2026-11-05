@@ -40,7 +40,9 @@ name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
 
 [terminal]
 scrollback_rows = 10000  # 0: go-term's 5000 rows; negative: no scrollback
+cursor_style    = "block"  # block, underline or bar
 cursor_blink    = true
+cursor_lock     = false    # ignore a child's DECSCUSR cursor changes
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: last session's directory, then home
 ```
@@ -111,9 +113,20 @@ partial palette fallback.
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `scrollback_rows` | int | `10000` | History rows kept above the screen. `0` keeps go-term's own default (5000), a positive value caps history, a negative value disables it. |
+| `cursor_style` | string | `"block"` | Cursor shape: `block`, `underline` or `bar`. |
 | `cursor_blink` | bool | `true` | Whether the cursor blinks. |
+| `cursor_lock` | bool | `false` | Ignore the child's cursor-shape requests (DECSCUSR) for the life of the window. |
 | `shell` | string | `""` | Shell to run. Empty selects `$SHELL`, then the OS login shell. |
 | `dir` | string | `""` | Starting directory. Empty restores the previous session's directory, then home. |
+
+`cursor_style` is matched case-insensitively, and `beam` is accepted as a
+synonym for `bar`; an empty value keeps `block`, while any other spelling is
+logged and replaced by `block`. The three keys describe the cursor the window
+starts with and the one `reset` (the shell command and the escape sequences)
+returns to. They are defaults, not overrides: with `cursor_lock = false` an
+application can still change the shape, as vim does for insert mode. Setting
+`cursor_lock = true` makes the window drop those requests, so the configured
+shape and blink hold for the whole session.
 
 `shell` is taken literally as the program to run; use an absolute path to be
 unambiguous. A configured shell outranks `$SHELL`. When the chosen shell
