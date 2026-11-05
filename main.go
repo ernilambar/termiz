@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-gui-org/go-gui/gui"
@@ -90,6 +91,7 @@ With no command, termiz opens a native window running the login shell on a PTY.
 }
 
 func launch() {
+	openLog()
 	cfg := loadConfig()
 	command, env := shellSpec(cfg)
 	named, ok := lookupTheme(cfg.Theme.Name)
@@ -134,7 +136,7 @@ func launch() {
 				Identity:        "termiz",
 				IdentityVersion: version,
 				Command:         command,
-				Args:            shellArgs(),
+				Args:            shellArgs(command),
 				Env:             env,
 				Dir:             dir,
 				// The first entry seeds the grid and the COLORFGBG the child
@@ -205,11 +207,29 @@ func paddedView(tm *term.Term, pad int) func(*gui.Window) gui.View {
 	}
 }
 
+// loginShells are the shells known to accept -l. Anything else is started
+// without it: a shell that rejects the flag would exit at once and take the
+// window with it.
+var loginShells = map[string]bool{
+	"sh": true, "bash": true, "zsh": true, "fish": true, "dash": true,
+	"ksh": true, "mksh": true, "tcsh": true, "csh": true, "nu": true,
+	"xonsh": true,
+}
+
 // shellArgs makes the shell a login shell, as Terminal.app and iTerm do: a
 // Dock or Finder launch inherits launchd's bare environment, and only a login
-// shell reads ~/.zprofile, where Homebrew's PATH setup lives. -l is
-// understood by zsh, bash, fish and dash.
-func shellArgs() []string { return []string{"-l"} }
+// shell reads ~/.zprofile, where Homebrew's PATH setup lives. An empty
+// command is go-term's /bin/sh fallback.
+func shellArgs(command string) []string {
+	name := "sh"
+	if command != "" {
+		name = filepath.Base(command)
+	}
+	if loginShells[name] {
+		return []string{"-l"}
+	}
+	return nil
+}
 
 // loginShell resolves the user's shell. $SHELL is authoritative when set; a
 // GUI launch (Finder, app bundle) can inherit an environment without it, and

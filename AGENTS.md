@@ -23,7 +23,9 @@ config file at `$XDG_CONFIG_HOME/termiz/config.toml` (default
 `~/.config/termiz/config.toml`) sets the window, font, theme and terminal
 values; see `config.go`. A written state file at
 `$XDG_STATE_HOME/termiz/state.toml` (default `~/.local/state/termiz/state.toml`)
-restores the last shell directory; see `state.go`.
+restores the last shell directory; see `state.go`. A GUI launch's stderr goes
+nowhere, so `openLog` (`logfile.go`) also writes the log to
+`~/Library/Logs/termiz.log`, truncated at launch once it passes 1 MiB.
 
 ## Commands
 
@@ -49,7 +51,8 @@ go build ./...
   fallback. Never substitute `/bin/sh`. A
   `terminal.shell` in the config file outranks `$SHELL` by design; that
   precedence lives in `shellSpec`, not in `loginShell`. The shell is started
-  with `-l` (`shellArgs`) so `~/.zprofile` runs on a Dock launch.
+  with `-l` (`shellArgs`) so `~/.zprofile` runs on a Dock launch, but only
+  when its basename is in `loginShells`; an unknown shell may reject the flag.
 - Configuration is read by the loader, never written with values. `defaultConfig` in
   `config.go` is the only place the built-in values live, and `launch` takes
   every window and terminal value from the loaded struct instead of a literal.
@@ -66,6 +69,9 @@ go build ./...
 - `Termiz > Settings` (`menu.go`) opens the config in `$VISUAL`,
   then `$EDITOR`, and otherwise in the system text editor. A terminal editor
   (`isTerminalEditor`) counts as unset because the app has no TTY to give it.
+  The editor runs with the login shell's PATH (`loginPATH`, `userpath.go`),
+  since launchd's PATH misses editor CLIs; a command that still does not
+  resolve falls back to the text editor. The action runs off the main thread.
   The item belongs in
   the app menu, but go-gui's native app menu has no slot for app-defined items:
   `installMenubar` declares a throwaway top-level menu and

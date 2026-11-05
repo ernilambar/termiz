@@ -66,7 +66,8 @@ The app reads one optional file: `$XDG_CONFIG_HOME/termiz/config.toml`, or
 at startup, so a change applies on the next launch. Everything is optional; a
 missing file means the defaults below. Unknown keys and out-of-range values are
 logged and replaced by the default, so a typo never keeps the window from
-opening. The app writes one file of its own, the state file described under
+opening. The log is `~/Library/Logs/termiz.log` (also in Console.app); check it
+when a setting seems ignored or the window closes on launch. The app writes one file of its own, the state file described under
 `terminal.dir`, and never touches the config.
 
 ```toml
@@ -123,8 +124,10 @@ target, a cycle, or a chain more than 8 files deep is logged and skipped; the
 rest of the file still applies.
 
 `Termiz > Settings…` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
-this file with it; when neither is set, or the editor is a terminal one such as
-vim or nano, the default text editor opens it. The
+this file with it, looked up in your login shell's `PATH` so `code -w` or
+`subl -w` work from a Dock launch. When neither is set, the command is not
+found, or it is a terminal editor such as vim or nano, the default text editor
+opens it. The
 directory is created when missing, and a missing file is created with a comment
 pointing at `docs/config.md`. The app never writes a setting, so the editor is
 the one that changes the contents.

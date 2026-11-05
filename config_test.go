@@ -397,3 +397,34 @@ func TestReadConfigShell(t *testing.T) {
 		t.Errorf("Shell = %q, want empty so the login shell applies", cfg.Terminal.Shell)
 	}
 }
+
+func TestReadConfigRelativeDirIsUnderHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.Mkdir(filepath.Join(home, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, warnings := readConfig(writeConfig(t, "[terminal]\ndir = \"src\"\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if want := filepath.Join(home, "src"); cfg.Terminal.Dir != want {
+		t.Errorf("Terminal.Dir = %q, want %q", cfg.Terminal.Dir, want)
+	}
+}
+
+func TestShellArgs(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"/bin/zsh", true},
+		{"/opt/homebrew/bin/fish", true},
+		{"", true},
+		{"/opt/homebrew/bin/elvish", false},
+	} {
+		if got := len(shellArgs(tc.in)) == 1; got != tc.want {
+			t.Errorf("shellArgs(%q) login = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

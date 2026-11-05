@@ -62,5 +62,10 @@ func sessionDir(tm *term.Term) string {
 	if dir := cwdLocalPath(tm.Cwd()); dir != "" {
 		return dir
 	}
+	// A shell that has exited may have had its PID reused by now; asking the
+	// OS then would report another process's directory.
+	if !tm.Alive() {
+		return ""
+	}
 	return pidCwd(tm.PID())
 }

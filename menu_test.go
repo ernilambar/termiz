@@ -174,6 +174,35 @@ func TestSeedConfig(t *testing.T) {
 	}
 }
 
+// TestOpenConfigInEditorUnresolvedEditorFallsBack pins that an editor the
+// login PATH cannot find opens the system text editor instead of failing
+// silently in sh.
+func TestOpenConfigInEditorUnresolvedEditorFallsBack(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
+	t.Setenv("VISUAL", "")
+	t.Setenv("EDITOR", "termiz-no-such-editor -w")
+
+	bin := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	capture := filepath.Join(dir, "open-args")
+	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > '%s'\n", capture)
+	if err := os.WriteFile(filepath.Join(bin, "open"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := openConfigInEditor(); err != nil {
+		t.Fatalf("openConfigInEditor: %v", err)
+	}
+	got := waitForEditorArgs(t, capture)
+	if len(got) != 2 || got[0] != "-t" {
+		t.Fatalf("open argv = %q, want [-t <config path>]", got)
+	}
+}
+
 func TestIsTerminalEditor(t *testing.T) {
 	for _, tc := range []struct {
 		in   string

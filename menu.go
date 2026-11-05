@@ -55,9 +55,13 @@ func installMenubar(app *gui.App) {
 			if id != settingsActionID {
 				return
 			}
-			if err := openConfigInEditor(); err != nil {
-				log.Printf("settings: %v", err)
-			}
+			// Off the main thread: the first call asks the login shell for
+			// its PATH, which can take seconds with a heavy profile.
+			go func() {
+				if err := openConfigInEditor(); err != nil {
+					log.Printf("settings: %v", err)
+				}
+			}()
 		},
 	})
 	// SetNativeMenubar installs synchronously on the calling (main) thread,
@@ -68,7 +72,9 @@ func installMenubar(app *gui.App) {
 // openConfigInEditor opens the primary config file in $VISUAL, then $EDITOR,
 // and otherwise in the system text editor. A terminal editor (vim, nano, …)
 // counts as unset: the app has no terminal to give it, so it would run
-// invisibly with nowhere to draw. $VISUAL and $EDITOR may carry
+// invisibly with nowhere to draw. The editor runs with the login shell's PATH
+// (loginPATH), because a Dock launch's own PATH finds none of the usual editor
+// CLIs; one that still does not resolve also falls back to the text editor. $VISUAL and $EDITOR may carry
 // arguments ("code -w"), so the shell splits the command and the path arrives
 // as "$@" — quoting stays intact whatever the path contains.
 //
@@ -90,6 +96,18 @@ func openConfigInEditor() error {
 		log.Printf("settings: %q needs a terminal; using the system text editor", editor)
 		editor = ""
 	}
+	env := os.Environ()
+	if editor != "" {
+		pathList := os.Getenv("PATH")
+		if p := loginPATH(); p != "" {
+			pathList = p
+			env = withPATH(env, p)
+		}
+		if _, ok := lookPathIn(strings.Fields(editor)[0], pathList); !ok {
+			log.Printf("settings: %q is not on PATH; using the system text editor", editor)
+			editor = ""
+		}
+	}
 	// Seed before launching either editor so the reference is there to read;
 	// TextEdit additionally refuses a path that does not exist yet.
 	if err := seedConfig(path); err != nil {
@@ -98,6 +116,7 @@ func openConfigInEditor() error {
 
 	if editor != "" {
 		cmd := exec.Command("/bin/sh", "-c", editor+` "$@"`, "sh", path)
+		cmd.Env = env
 		// A misspelled editor is otherwise silent: sh writes to stderr,
 		// which a process started with a nil Stderr discards.
 		cmd.Stderr = os.Stderr

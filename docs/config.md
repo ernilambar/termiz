@@ -128,13 +128,15 @@ shape and blink hold for the whole session.
 `shell` is the program to run. `~` and `$VAR` expand, and a bare name is
 looked up in `PATH` — but a Dock or Finder launch has launchd's minimal `PATH`,
 so use an absolute path to be unambiguous. A shell that cannot be found is
-logged and the login-shell resolution below applies instead. The shell
-starts as a login shell (`-l`), as Terminal.app does, so `~/.zprofile`
-runs. A configured shell outranks `$SHELL`. When the chosen shell
+logged and the login-shell resolution below applies instead. A known shell
+(sh, bash, zsh, fish, dash, ksh, mksh, tcsh, csh, nu, xonsh) starts as a login
+shell (`-l`), as Terminal.app does, so `~/.zprofile` runs; any other shell is
+started without the flag, since one that rejects it would exit at once. A configured shell outranks `$SHELL`. When the chosen shell
 differs from the inherited `$SHELL`, the child is given the matching `SHELL`,
 so subshells and tools that re-exec `$SHELL` agree with the window.
 
-`dir` expands a leading `~` and `$VAR` references. The value must name an
+`dir` expands a leading `~` and `$VAR` references, and a relative path is
+relative to the home directory. The value must name an
 existing directory at load time; otherwise it is logged and treated as empty,
 falling through to the previous session's directory and then home.
 
@@ -183,8 +185,9 @@ Resolution rules:
 
 ## Error handling
 
-Loading never fails the launch. Problems are written to the log and the
-affected value is replaced by its default:
+Loading never fails the launch. Problems are written to the log —
+`~/Library/Logs/termiz.log`, which Console.app also shows, and stderr when run
+from a terminal — and the affected value is replaced by its default:
 
 | Problem | Result |
 | --- | --- |
@@ -209,8 +212,11 @@ on its own still leaves the last directory. Naming `terminal.dir` pins the
 start directory and stops the state write entirely.
 
 `Termiz > Settings…` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
-the system text editor. A terminal editor (vim, nvim, nano, emacs, …) is
-skipped, because the app has no terminal to run it in. It creates the config directory when missing and seeds
+the system text editor. The editor command is looked up in the login shell's
+`PATH`, because a Dock launch's own `PATH` misses Homebrew and editor CLIs; a
+command that is still not found, or a terminal editor (vim, nvim, nano, emacs,
+…), falls back to the system text editor. It creates the config directory when
+missing and seeds
 a missing file with a comment pointing at this reference page — the system
 editor also needs the path to exist. It never changes any value.
 
@@ -222,5 +228,5 @@ The loader logs under the `config:` prefix. To check a file without a GUI:
 go test ./... -run Config
 ```
 
-Or launch `./termiz` and inspect the log; every warning names the file it came
-from, except repairs.
+Or launch termiz and read `~/Library/Logs/termiz.log`; every warning names the
+file it came from, except repairs.

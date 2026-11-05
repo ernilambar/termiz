@@ -115,7 +115,8 @@ type terminalConfig struct {
 	// Shell is the program to run; ~ and $VAR expand, and a bare name is
 	// looked up in PATH. It starts as a login shell on macOS (see shellArgs).
 	Shell string `toml:"shell"`
-	// Dir is the shell's starting directory; ~ and $VAR expand. Empty restores
+	// Dir is the shell's starting directory; ~ and $VAR expand, and a
+	// relative path is relative to the home directory. Empty restores
 	// the directory the previous session ended in (see state.go), falling back
 	// to the home directory when there is none or it no longer exists.
 	Dir string `toml:"dir"`
@@ -364,6 +365,14 @@ func normalize(c *config) []string {
 
 	if c.Terminal.Dir != "" {
 		dir := expandPath(c.Terminal.Dir)
+		// A relative path would resolve against the app's own working
+		// directory, which is "/" for a Finder launch; home is what a user
+		// typing "src" means.
+		if !filepath.IsAbs(dir) {
+			if home, err := os.UserHomeDir(); err == nil {
+				dir = filepath.Join(home, dir)
+			}
+		}
 		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 			warn("terminal.dir %q is not a directory; using the default start directory", c.Terminal.Dir)
 			c.Terminal.Dir = ""
