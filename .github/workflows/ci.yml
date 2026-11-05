@@ -11,9 +11,7 @@ permissions:
 jobs:
   check:
     name: Quality gate
-    # macOS for the cgo Metal build and the darwin-only tests; the Linux and
-    # Windows builds below run cgo-free from the same runner, which is what
-    # keeps those targets from silently picking up a cgo dependency.
+    # termiz is darwin/arm64 only, and the Metal backend needs cgo.
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -38,11 +36,5 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Build (macOS)
+      - name: Build
         run: go build -o /dev/null .
-
-      - name: Build (Linux, cgo-free)
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /dev/null .
-
-      - name: Build (Windows, cgo-free)
-        run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /dev/null .

@@ -19,8 +19,8 @@ before you write code.
 - Go 1.27.3 or later (see `go.mod`)
 - macOS on Apple silicon, plus Xcode Command Line Tools —
   `xcode-select --install`. The Metal backend is Objective-C, so cgo is
-  required on macOS. Linux and Windows build cgo-free, but releases target
-  darwin/arm64 only.
+  required. termiz targets darwin/arm64 only; Linux and Windows are not
+  supported.
 
 ### Set up
 
@@ -71,8 +71,8 @@ packages. `main` wires the window to `term.Term`; `config.go` reads the optional
 settings file and owns the built-in defaults, `theme.go` resolves a configured
 theme name against go-term's bundled corpus and maps its light/dark character
 to the window chrome, `state.go` persists the last shell directory, and
-`loginShell` resolves the shell and is the one place platform branches belong
-(alongside `window_*.go` and the child-cwd lookup in `cwd_*.go`).
+`loginShell` resolves the shell. The AppKit and libproc calls live in the cgo
+`*_darwin.go` files.
 
 ## Check locally before opening a pull request
 

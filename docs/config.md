@@ -71,9 +71,6 @@ the window's rounded corners. `0` is allowed and leaves the grid at the
 widget's own 4 px inset; the text therefore starts `padding + 4` points from
 each edge. A negative or larger-than-`64` value is logged and replaced by `8`.
 
-`maximize` is macOS-only. A Linux or Windows build, or a cgo-free Darwin
-build, has no AppKit window to zoom and keeps the configured size.
-
 A `min_width`/`min_height` larger than the opening size is lowered to
 `width`/`height` rather than forcing the window to start below its own floor.
 
@@ -131,8 +128,8 @@ shape and blink hold for the whole session.
 `shell` is the program to run. `~` and `$VAR` expand, and a bare name is
 looked up in `PATH` — but a Dock or Finder launch has launchd's minimal `PATH`,
 so use an absolute path to be unambiguous. A shell that cannot be found is
-logged and the login-shell resolution below applies instead. On macOS the
-shell starts as a login shell (`-l`), as Terminal.app does, so `~/.zprofile`
+logged and the login-shell resolution below applies instead. The shell
+starts as a login shell (`-l`), as Terminal.app does, so `~/.zprofile`
 runs. A configured shell outranks `$SHELL`. When the chosen shell
 differs from the inherited `$SHELL`, the child is given the matching `SHELL`,
 so subshells and tools that re-exec `$SHELL` agree with the window.
@@ -147,7 +144,7 @@ For `shell`:
 
 1. `terminal.shell`, when non-empty.
 2. `$SHELL`, when set.
-3. The OS login shell (`dscl` on macOS, `getent` on Linux).
+3. The OS login shell (`dscl`).
 4. go-term's fallback, only if the OS answer is also empty.
 
 termiz never substitutes `/bin/sh` for an unresolved shell.

@@ -9,8 +9,9 @@ running a real shell on a PTY. Core stack is Go (module
 
 ## Setup
 
-Requires Go 1.27.3+ (see `go.mod`). On macOS a C toolchain is required because
-the Metal backend is Objective-C; Linux and Windows build cgo-free.
+Requires Go 1.27.3+ (see `go.mod`) and macOS on Apple silicon with a C
+toolchain: the Metal backend is Objective-C, so cgo is mandatory. termiz
+targets darwin/arm64 only; there is no Linux or Windows code.
 
 ```bash
 go mod download
@@ -44,12 +45,11 @@ go build ./...
 - Keep everything in `package main` until there is a real reason to split
   packages; this is a small single-binary app, not a library.
 - The shell resolution rule in `loginShell` is deliberate: `$SHELL` wins, then
-  the OS login shell (`dscl` on macOS, `getent` on Linux), and only an empty
-  result defers to `go-term`'s fallback. Never substitute `/bin/sh`, and never
-  add platform branches without a matching `runtime.GOOS` guard. A
+  the OS login shell (`dscl`), and only an empty result defers to `go-term`'s
+  fallback. Never substitute `/bin/sh`. A
   `terminal.shell` in the config file outranks `$SHELL` by design; that
-  precedence lives in `shellSpec`, not in `loginShell`. On macOS the shell is
-  started with `-l` (`shellArgs`) so `~/.zprofile` runs on a Dock launch.
+  precedence lives in `shellSpec`, not in `loginShell`. The shell is started
+  with `-l` (`shellArgs`) so `~/.zprofile` runs on a Dock launch.
 - Configuration is read by the loader, never written with values. `defaultConfig` in
   `config.go` is the only place the built-in values live, and `launch` takes
   every window and terminal value from the loaded struct instead of a literal.
@@ -69,19 +69,16 @@ go build ./...
   The item belongs in
   the app menu, but go-gui's native app menu has no slot for app-defined items:
   `installMenubar` declares a throwaway top-level menu and
-  `moveMenuItemsIntoAppMenu` (`menu_darwin.go`, cgo; `menu_other.go` is the
-  stub) moves its items above Quit and removes the empty menu. Installing a
+  `moveMenuItemsIntoAppMenu` (`menu_darwin.go`, cgo) moves its items above Quit and removes the empty menu. Installing a
   native menubar needs App mode (`gui.NewApp` + `backend.RunApp`): only a
   registered App owns one. `open(1)` does not inherit the caller's environment,
   so the `dev.sh` CLI shim forwards `VISUAL` and `EDITOR`. The action creates
   the config directory and seeds a missing file with `configHeader`, a comment
   that links `docs/config.md` and sets no value (the system editor also needs
   the path to exist); an existing file is never touched.
-- Window maximization is macOS-only and lives behind `maximizeWindow`
-  (`window_darwin.go`, cgo; `window_other.go` is the stub): go-gui exposes no
-  maximize or fullscreen call, so the Darwin build zooms the AppKit key window
-  in `OnInit`, and every other target keeps the configured size. Keep the two
-  files in step, and never let the stub need cgo.
+- Window maximization lives behind `maximizeWindow` (`window_darwin.go`, cgo):
+  go-gui exposes no maximize or fullscreen call, so it zooms the AppKit key
+  window in `OnInit`.
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
   the `defer` in `launch`, so closing the window tears down the PTY.
@@ -119,10 +116,9 @@ go build ./...
   shell is still alive. `terminal.dir` pins the start directory and suppresses
   both writes. The directory is the shell's OSC 7 report (`cwdLocalPath`,
   percent-decoded, a remote host ignored) when it emits one, else the shell process cwd
-  (`cwd_darwin.go` via libproc, `cwd_linux.go` via /proc, `cwd_other.go` stub).
+  (`cwd_darwin.go` via libproc).
   Keep the state write atomic and the file 0600.
-- Do not introduce external dependencies without updating `go.mod`/`go.sum`
-  and checking that non-macOS builds remain cgo-free.
+- Do not introduce external dependencies without updating `go.mod`/`go.sum`.
 
 ## Quality gate
 

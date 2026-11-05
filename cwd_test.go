@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -33,15 +32,12 @@ func TestCwdLocalPath(t *testing.T) {
 }
 
 func TestPidCwd(t *testing.T) {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-		t.Skip("no child cwd lookup on this platform")
-	}
 	if got := pidCwd(0); got != "" {
 		t.Errorf("pidCwd(0) = %q, want empty", got)
 	}
 
-	// t.TempDir may live under a symlink (/var → /private/var on macOS, /tmp
-	// on some Linux installs); the OS reports the resolved path.
+	// t.TempDir lives under a symlink (/var → /private/var); the OS reports
+	// the resolved path.
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -68,8 +68,7 @@ type config struct {
 type windowConfig struct {
 	// Maximize opens the window filling the screen's visible area, the same
 	// operation as the Window > Zoom menu item. Set false to open at
-	// Width×Height instead. Ignored where AppKit is unavailable (Linux,
-	// Windows, cgo-free builds), which keep the configured size.
+	// Width×Height instead.
 	Maximize  bool `toml:"maximize"`
 	Width     int  `toml:"width"`
 	Height    int  `toml:"height"`

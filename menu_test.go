@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -41,10 +40,6 @@ func waitForEditorArgs(t *testing.T, capture string) []string {
 // outranks $EDITOR, a blank value counts as unset, and the path handed to the
 // editor is the primary config path with its directory created.
 func TestOpenConfigInEditorEditorPrecedence(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell editor command")
-	}
-
 	for _, tc := range []struct {
 		name        string
 		visualSet   bool
@@ -110,10 +105,6 @@ func TestOpenConfigInEditorEditorPrecedence(t *testing.T) {
 // the macOS default text editor is launched with -t, and the config file is
 // created first because TextEdit refuses a path that does not exist.
 func TestOpenConfigInEditorFallsBackToTextEditor(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("open(1) fallback is macOS-only")
-	}
-
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
 	t.Setenv("VISUAL", "")

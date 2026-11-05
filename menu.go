@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-gui-org/go-gui/gui"
@@ -90,9 +89,6 @@ func openConfigInEditor() error {
 	if isTerminalEditor(editor) {
 		log.Printf("settings: %q needs a terminal; using the system text editor", editor)
 		editor = ""
-	}
-	if editor == "" && runtime.GOOS != "darwin" {
-		return errors.New("neither $VISUAL nor $EDITOR names a GUI editor")
 	}
 	// Seed before launching either editor so the reference is there to read;
 	// TextEdit additionally refuses a path that does not exist yet.

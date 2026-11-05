@@ -3,7 +3,6 @@ package main
 import (
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-gui-org/go-term/term"
@@ -31,11 +30,6 @@ func cwdLocalPath(cwd string) string {
 		if dec, err := url.PathUnescape(p); err == nil {
 			p = dec
 		}
-	}
-	// A Windows file URI carries a slash before the drive letter ("/C:/x");
-	// VolumeName is empty on every other OS, so the strip never fires there.
-	if len(p) > 1 && p[0] == '/' && filepath.VolumeName(p[1:]) != "" {
-		p = p[1:]
 	}
 	return p
 }

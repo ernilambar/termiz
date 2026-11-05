@@ -23,8 +23,8 @@ open /Applications/<Name>.app
 
 ## Build and run
 
-Requires Go 1.27.3+ and, on macOS, a C toolchain (the Metal backend is
-Objective-C). Linux and Windows build cgo-free.
+Requires Go 1.27.3+ and macOS on Apple silicon with a C toolchain (the Metal
+backend is Objective-C). Linux and Windows are not supported.
 
 ```bash
 go build -o termiz .
@@ -106,8 +106,7 @@ cursor either way. An unknown style is logged and replaced by `block`.
 
 `window.maximize`, on by default, opens the window filling the screen's
 visible area — the same as the Window > Zoom menu item. Set it to `false` to
-open at `width`×`height` instead. It is macOS-only: a Linux or Windows build,
-or a cgo-free Darwin build, keeps the configured size.
+open at `width`×`height` instead.
 
 `window.padding` is the inset, in points, between the window edge and the
 terminal, and defaults to `8`. The terminal keeps a 4 px inset of its own
@@ -132,8 +131,8 @@ the one that changes the contents.
 
 `terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
 window runs, and the child is given the matching `SHELL`. Leave it empty to
-keep the `$SHELL` → OS login shell resolution. On macOS the shell starts as a
-login shell, so `~/.zprofile` (Homebrew's `PATH` setup) runs.
+keep the `$SHELL` → OS login shell resolution. The shell starts as a login
+shell, so `~/.zprofile` (Homebrew's `PATH` setup) runs.
 
 With `terminal.dir` empty the shell starts where the previous session ended,
 so quitting and reopening resumes in the same directory. termiz records the

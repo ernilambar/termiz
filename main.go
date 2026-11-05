@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"runtime"
 	"strings"
 
 	"github.com/go-gui-org/go-gui/gui"
@@ -206,17 +205,11 @@ func paddedView(tm *term.Term, pad int) func(*gui.Window) gui.View {
 	}
 }
 
-// shellArgs makes the shell a login shell on macOS, as Terminal.app and iTerm
-// do: a Dock or Finder launch inherits launchd's bare environment, and only a
-// login shell reads ~/.zprofile, where Homebrew's PATH setup lives. -l is
-// understood by zsh, bash, fish and dash. Other platforms keep go-term's
-// plain interactive shell, which is their terminals' convention.
-func shellArgs() []string {
-	if runtime.GOOS == "darwin" {
-		return []string{"-l"}
-	}
-	return nil
-}
+// shellArgs makes the shell a login shell, as Terminal.app and iTerm do: a
+// Dock or Finder launch inherits launchd's bare environment, and only a login
+// shell reads ~/.zprofile, where Homebrew's PATH setup lives. -l is
+// understood by zsh, bash, fish and dash.
+func shellArgs() []string { return []string{"-l"} }
 
 // loginShell resolves the user's shell. $SHELL is authoritative when set; a
 // GUI launch (Finder, app bundle) can inherit an environment without it, and
@@ -230,25 +223,13 @@ func loginShell() string {
 	if err != nil {
 		return ""
 	}
-	switch runtime.GOOS {
-	case "darwin":
-		out, err := exec.Command("/usr/bin/dscl", ".", "-read", "/Users/"+u.Username, "UserShell").Output()
-		if err != nil {
-			return ""
-		}
-		for _, line := range strings.Split(string(out), "\n") {
-			if v, ok := strings.CutPrefix(line, "UserShell:"); ok {
-				return strings.TrimSpace(v)
-			}
-		}
-	case "linux":
-		out, err := exec.Command("getent", "passwd", u.Username).Output()
-		if err != nil {
-			return ""
-		}
-		fields := strings.Split(strings.TrimSpace(string(out)), ":")
-		if len(fields) >= 7 && fields[6] != "" {
-			return fields[6]
+	out, err := exec.Command("/usr/bin/dscl", ".", "-read", "/Users/"+u.Username, "UserShell").Output()
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if v, ok := strings.CutPrefix(line, "UserShell:"); ok {
+			return strings.TrimSpace(v)
 		}
 	}
 	return ""
