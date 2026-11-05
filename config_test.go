@@ -359,3 +359,41 @@ func TestReadConfigStopsDeepIncludeChain(t *testing.T) {
 		t.Fatalf("warnings = %q, want one about the depth limit", warnings)
 	}
 }
+
+func TestReadConfigWrongTypeCostsOnlyThatKey(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[window]\nwidth = \"1200\"\nheight = 700\n[font]\nsize = 16\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "window.width") {
+		t.Fatalf("warnings = %q, want one naming window.width", warnings)
+	}
+	if cfg.Window.Width != defaultWidth {
+		t.Errorf("Window.Width = %d, want default %d", cfg.Window.Width, defaultWidth)
+	}
+	if cfg.Window.Height != 700 || cfg.Font.Size != 16 {
+		t.Errorf("cfg = %+v, want the well-typed keys applied", cfg)
+	}
+}
+
+func TestReadConfigSyntaxErrorIgnoresFile(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[font]\nsize = 16\nwidth = \n"))
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %q, want one parse error", warnings)
+	}
+	if cfg != defaultConfig() {
+		t.Errorf("cfg = %+v, want defaults", cfg)
+	}
+}
+
+func TestReadConfigShell(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[terminal]\nshell = \"sh\"\n"))
+	if len(warnings) != 0 || !filepath.IsAbs(cfg.Terminal.Shell) {
+		t.Errorf("shell \"sh\": Shell = %q, warnings %q; want a resolved absolute path", cfg.Terminal.Shell, warnings)
+	}
+
+	cfg, warnings = readConfig(writeConfig(t, "[terminal]\nshell = \"/no/such/shell\"\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "terminal.shell") {
+		t.Fatalf("warnings = %q, want one naming terminal.shell", warnings)
+	}
+	if cfg.Terminal.Shell != "" {
+		t.Errorf("Shell = %q, want empty so the login shell applies", cfg.Terminal.Shell)
+	}
+}

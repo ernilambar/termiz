@@ -48,7 +48,7 @@ func installMenubar(app *gui.App) {
 			Title: settingsMenuTitle,
 			Items: []gui.NativeMenuItemCfg{{
 				ID:       settingsActionID,
-				Text:     "Settings",
+				Text:     "Settings…",
 				Shortcut: gui.Shortcut{Key: gui.KeyComma, Modifiers: gui.ModSuper},
 			}},
 		}},
@@ -67,7 +67,9 @@ func installMenubar(app *gui.App) {
 }
 
 // openConfigInEditor opens the primary config file in $VISUAL, then $EDITOR,
-// and otherwise in the system text editor. $VISUAL and $EDITOR may carry
+// and otherwise in the system text editor. A terminal editor (vim, nano, …)
+// counts as unset: the app has no terminal to give it, so it would run
+// invisibly with nowhere to draw. $VISUAL and $EDITOR may carry
 // arguments ("code -w"), so the shell splits the command and the path arrives
 // as "$@" — quoting stays intact whatever the path contains.
 //
@@ -85,8 +87,12 @@ func openConfigInEditor() error {
 	}
 
 	editor := firstEnv("VISUAL", "EDITOR")
+	if isTerminalEditor(editor) {
+		log.Printf("settings: %q needs a terminal; using the system text editor", editor)
+		editor = ""
+	}
 	if editor == "" && runtime.GOOS != "darwin" {
-		return errors.New("neither $VISUAL nor $EDITOR is set")
+		return errors.New("neither $VISUAL nor $EDITOR names a GUI editor")
 	}
 	// Seed before launching either editor so the reference is there to read;
 	// TextEdit additionally refuses a path that does not exist yet.
@@ -99,12 +105,37 @@ func openConfigInEditor() error {
 		// A misspelled editor is otherwise silent: sh writes to stderr,
 		// which a process started with a nil Stderr discards.
 		cmd.Stderr = os.Stderr
-		return cmd.Start()
+		return startDetached(cmd)
 	}
 
 	cmd := exec.Command("open", "-t", path)
 	cmd.Stderr = os.Stderr
-	return cmd.Start()
+	return startDetached(cmd)
+}
+
+// startDetached starts cmd and reaps it in the background, so each Settings
+// click does not leave a zombie behind for the life of the app.
+func startDetached(cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+// terminalEditors are editors that draw in a terminal and cannot run from a
+// GUI process with no TTY.
+var terminalEditors = map[string]bool{
+	"vi": true, "vim": true, "nvim": true, "nano": true, "pico": true,
+	"emacs": true, "micro": true, "hx": true, "helix": true, "kak": true,
+	"joe": true, "ne": true, "mg": true, "ed": true,
+}
+
+// isTerminalEditor reports whether the editor command's program is a known
+// terminal editor; "code -w" or a path to a GUI app's CLI is not.
+func isTerminalEditor(editor string) bool {
+	fields := strings.Fields(editor)
+	return len(fields) > 0 && terminalEditors[filepath.Base(fields[0])]
 }
 
 // seedConfig creates path with the reference header when it is missing. The

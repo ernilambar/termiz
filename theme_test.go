@@ -9,37 +9,23 @@ import (
 
 func TestLookupTheme(t *testing.T) {
 	for _, name := range []string{"", "default", "DEFAULT"} {
-		th, ok := lookupTheme(name)
-		if !ok || th != term.DefaultTheme {
-			t.Errorf("lookupTheme(%q) = %+v, %v; want go-term's default theme", name, th, ok)
+		nt, ok := lookupTheme(name)
+		if !ok || nt.Theme != term.DefaultTheme || nt.Name != themeNameDefault {
+			t.Errorf("lookupTheme(%q) = %q, %v; want go-term's default theme named %q", name, nt.Name, ok, themeNameDefault)
 		}
 	}
 
-	th, ok := lookupTheme("catppuccin mocha")
-	if !ok {
-		t.Fatal(`lookupTheme("catppuccin mocha") did not find the bundled theme`)
+	nt, ok := lookupTheme("catppuccin mocha")
+	if !ok || nt.Name != "Catppuccin Mocha" {
+		t.Fatalf(`lookupTheme("catppuccin mocha") = %q, %v; want "Catppuccin Mocha", true`, nt.Name, ok)
 	}
 	exact, ok := lookupTheme("Catppuccin Mocha")
-	if !ok || th != exact {
-		t.Errorf("case-insensitive lookup = %+v, %v; want the exact lookup %+v, %v", th, ok, exact, ok)
+	if !ok || nt.Theme != exact.Theme {
+		t.Errorf("case-insensitive lookup differs from the exact lookup")
 	}
 
 	if _, ok := lookupTheme("No Such Theme"); ok {
 		t.Error(`lookupTheme("No Such Theme") found a theme; want not found`)
-	}
-}
-
-func TestCanonicalThemeName(t *testing.T) {
-	if got, ok := canonicalThemeName("catppuccin mocha"); !ok || got != "Catppuccin Mocha" {
-		t.Errorf(`canonicalThemeName("catppuccin mocha") = %q, %v; want "Catppuccin Mocha", true`, got, ok)
-	}
-	for _, name := range []string{"", "default"} {
-		if got, ok := canonicalThemeName(name); !ok || got != themeNameDefault {
-			t.Errorf("canonicalThemeName(%q) = %q, %v; want %q, true", name, got, ok, themeNameDefault)
-		}
-	}
-	if got, ok := canonicalThemeName("No Such Theme"); ok || got != "" {
-		t.Errorf(`canonicalThemeName("No Such Theme") = %q, %v; want "", false`, got, ok)
 	}
 }
 

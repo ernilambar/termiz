@@ -14,32 +14,19 @@ const themeNameDefault = "Default"
 // lookupTheme resolves a configured theme name against go-term's bundled
 // corpus, case-insensitively so the file need not reproduce the corpus
 // spelling. An empty name or themeNameDefault selects go-term's built-in
-// DefaultTheme.
-func lookupTheme(name string) (term.Theme, bool) {
+// DefaultTheme. The result carries the corpus spelling of the name; ok is
+// false when no bundled theme matches, so the caller can warn rather than
+// silently open the wrong colors.
+func lookupTheme(name string) (term.NamedTheme, bool) {
 	if name == "" || strings.EqualFold(name, themeNameDefault) {
-		return term.DefaultTheme, true
+		return term.NamedTheme{Name: themeNameDefault, Theme: term.DefaultTheme}, true
 	}
 	for _, nt := range term.BundledThemes() {
 		if strings.EqualFold(nt.Name, name) {
-			return nt.Theme, true
+			return nt, true
 		}
 	}
-	return term.Theme{}, false
-}
-
-// canonicalThemeName returns the corpus spelling of name, or themeNameDefault
-// for an empty name and for "default". ok is false when no bundled theme
-// matches, so the caller can warn rather than silently open the wrong colors.
-func canonicalThemeName(name string) (string, bool) {
-	if name == "" || strings.EqualFold(name, themeNameDefault) {
-		return themeNameDefault, true
-	}
-	for _, nt := range term.BundledThemes() {
-		if strings.EqualFold(nt.Name, name) {
-			return nt.Name, true
-		}
-	}
-	return "", false
+	return term.NamedTheme{}, false
 }
 
 // themeNames lists every selectable theme for `termiz themes`: the built-in

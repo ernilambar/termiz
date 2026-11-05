@@ -93,15 +93,12 @@ With no command, termiz opens a native window running the login shell on a PTY.
 func launch() {
 	cfg := loadConfig()
 	command, env := shellSpec(cfg)
-	theme, ok := lookupTheme(cfg.Theme.Name)
+	named, ok := lookupTheme(cfg.Theme.Name)
 	if !ok {
 		// normalize already warned; keep the window usable.
-		theme = term.DefaultTheme
+		named, _ = lookupTheme("")
 	}
-	themeName := cfg.Theme.Name
-	if themeName == "" {
-		themeName = themeNameDefault
-	}
+	theme := named.Theme
 
 	// terminal.dir is an explicit choice; without it the previous session's
 	// directory is restored when it still exists, so quitting and reopening
@@ -138,11 +135,12 @@ func launch() {
 				Identity:        "termiz",
 				IdentityVersion: version,
 				Command:         command,
+				Args:            shellArgs(),
 				Env:             env,
 				Dir:             dir,
 				// The first entry seeds the grid and the COLORFGBG the child
 				// is spawned with; after that the grid is the source of truth.
-				Themes: []term.NamedTheme{{Name: themeName, Theme: theme}},
+				Themes: []term.NamedTheme{named},
 				OnExit: w.Close,
 			})
 			if err != nil {
@@ -150,7 +148,7 @@ func launch() {
 				w.Close()
 				return
 			}
-			w.SetView(paddedView(tm, cfg.Window.Padding, theme.DefaultBG))
+			w.SetView(paddedView(tm, cfg.Window.Padding))
 			stopDirWatch = watchDir(tm, cfg)
 		},
 	})
@@ -186,13 +184,14 @@ func cursorStyle(name string) term.CursorStyle {
 
 // paddedView wraps the terminal in an outer container so window.padding is a
 // real inset from the window edge. The wrapper paints its band with the
-// terminal's background, matching what go-term already does for its own 4 px
-// inset, so the two bands read as one. A zero padding returns the terminal's
+// terminal's current background, matching what go-term already does for its
+// own 4 px inset, so the two bands read as one; it is read every frame because
+// a child can change the background (OSC 11) after launch. A zero padding returns the terminal's
 // own view unchanged: no extra container, no extra band.
 //
 // The wrapper must stay a plain Column: go-term expects to be the only
 // focusable node, and it asserts the window focus itself inside Term.View.
-func paddedView(tm *term.Term, pad int, bg gui.Color) func(*gui.Window) gui.View {
+func paddedView(tm *term.Term, pad int) func(*gui.Window) gui.View {
 	if pad <= 0 {
 		return tm.View
 	}
@@ -201,10 +200,22 @@ func paddedView(tm *term.Term, pad int, bg gui.Color) func(*gui.Window) gui.View
 		return gui.Column(gui.ContainerCfg{
 			Sizing:  gui.FillFill,
 			Padding: gui.PadAll(inset),
-			Color:   bg,
+			Color:   tm.Theme().DefaultBG,
 			Content: []gui.View{tm.View(w)},
 		})
 	}
+}
+
+// shellArgs makes the shell a login shell on macOS, as Terminal.app and iTerm
+// do: a Dock or Finder launch inherits launchd's bare environment, and only a
+// login shell reads ~/.zprofile, where Homebrew's PATH setup lives. -l is
+// understood by zsh, bash, fish and dash. Other platforms keep go-term's
+// plain interactive shell, which is their terminals' convention.
+func shellArgs() []string {
+	if runtime.GOOS == "darwin" {
+		return []string{"-l"}
+	}
+	return nil
 }
 
 // loginShell resolves the user's shell. $SHELL is authoritative when set; a

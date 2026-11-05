@@ -136,8 +136,8 @@ cat >"$cli" <<EOF
 app="$dest"
 if [ "\$#" -eq 0 ]; then
     # open(1) launches through LaunchServices, which does not inherit this
-    # shell's environment; forward the editor variables so Termiz > Open
-    # Config File… uses the editor this shell would.
+    # shell's environment; forward the editor variables so Termiz >
+    # Settings… uses the editor this shell would.
     set -- "\$app"
     if [ -n "\$VISUAL" ]; then set -- --env "VISUAL=\$VISUAL" "\$@"; fi
     if [ -n "\$EDITOR" ]; then set -- --env "EDITOR=\$EDITOR" "\$@"; fi

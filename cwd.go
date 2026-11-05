@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -15,11 +16,15 @@ import (
 // name would otherwise never resolve. A decode failure keeps the raw bytes
 // because a wrong path is caught by the isDir guard, whereas dropping the
 // value loses a usable directory outright.
+//
+// A URI naming another host is a shell on that host (ssh into a machine with
+// shell integration) and yields "", so a remote path is never restored locally
+// and the caller falls back to the local shell's own directory.
 func cwdLocalPath(cwd string) string {
 	p := cwd
 	if rest, ok := strings.CutPrefix(cwd, "file://"); ok {
 		slash := strings.IndexByte(rest, '/')
-		if slash < 0 {
+		if slash < 0 || !isLocalHost(rest[:slash]) {
 			return ""
 		}
 		p = rest[slash:]
@@ -33,6 +38,26 @@ func cwdLocalPath(cwd string) string {
 		p = p[1:]
 	}
 	return p
+}
+
+// isLocalHost reports whether an OSC 7 host names this machine: empty,
+// localhost, or this host's name. Only the first label is compared, because
+// macOS shells report "mac.local" or "mac" depending on their configuration.
+func isLocalHost(host string) bool {
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	name, err := os.Hostname()
+	if err != nil {
+		return false
+	}
+	short := func(h string) string {
+		if i := strings.IndexByte(h, '.'); i >= 0 {
+			return h[:i]
+		}
+		return h
+	}
+	return strings.EqualFold(short(host), short(name))
 }
 
 // sessionDir returns the shell's working directory for restoring the next

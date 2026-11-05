@@ -49,7 +49,10 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Test
-        run: go test ./...
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./...
 
       - name: Build
         run: |
@@ -72,8 +75,8 @@ jobs:
             exit 1
           fi
           # buildapp is pinned to the go-gui version in go.mod. The manifest
-          # supplies the bundle ID and display name; the tag supplies the
-          # version, so no second version source exists to fall out of date.
+          # supplies the bundle ID and display name; the version is main.go's
+          # constant, which the step above has checked against the tag.
           go run github.com/go-gui-org/go-gui/cmd/buildapp \
             -o "$PWD/dist" \
             -manifest "$PWD/appinfo.toml" \

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -42,10 +45,11 @@ import (
 //	shell           = ""   # empty: $SHELL, then the OS login shell
 //	dir             = ""   # empty: last session's directory, then home
 //
-// Reading is deliberately forgiving: a broken file, a bad value or an unknown
-// key is logged and the default is used, because a typo in a settings file
-// must not keep the window from opening. The file is read once at startup, so
-// a change applies on the next launch.
+// Reading is deliberately forgiving: a file with a syntax error is ignored
+// whole, while a bad value, a value of the wrong type or an unknown key is
+// logged and only that key falls back to its default, because a typo in a
+// settings file must not keep the window from opening. The file is read once
+// at startup, so a change applies on the next launch.
 type config struct {
 	// ConfigFile names another file to load as the base for this one, so the
 	// real settings can live wherever the user keeps them — a dotfiles
@@ -108,8 +112,10 @@ type terminalConfig struct {
 	// (DECSCUSR, CSI Ps SP q), pinning CursorStyle and CursorBlink for the
 	// life of the window. Off by default: vim and friends legitimately move
 	// the cursor, and silently dropping those requests would surprise them.
-	CursorLock bool   `toml:"cursor_lock"`
-	Shell      string `toml:"shell"`
+	CursorLock bool `toml:"cursor_lock"`
+	// Shell is the program to run; ~ and $VAR expand, and a bare name is
+	// looked up in PATH. It starts as a login shell on macOS (see shellArgs).
+	Shell string `toml:"shell"`
 	// Dir is the shell's starting directory; ~ and $VAR expand. Empty restores
 	// the directory the previous session ended in (see state.go), falling back
 	// to the home directory when there is none or it no longer exists.
@@ -202,7 +208,7 @@ func readConfig(path string) (config, []string) {
 }
 
 // readConfigFile decodes path over base. A `config_file` key names another
-// file: it is loaded first, then path is decoded again over it, so the file
+// file: it is loaded first, then path is applied again over it, so the file
 // carrying the key still wins for every value it sets itself. depth 0 is the
 // user's config file, where missing is normal; a missing target deeper in the
 // chain is a warning, because the user asked for it.
@@ -217,19 +223,18 @@ func readConfigFile(path string, base config, depth int, seen map[string]bool) (
 	seen[key] = true
 	defer delete(seen, key)
 
-	cfg := base
-	md, err := toml.DecodeFile(path, &cfg)
-	if err != nil {
+	// A syntax error makes the document meaningless, so the file is ignored
+	// whole; a value of the wrong type only costs that key (applyKeys).
+	var doc map[string]any
+	if _, err := toml.DecodeFile(path, &doc); err != nil {
 		if errors.Is(err, fs.ErrNotExist) && depth == 0 {
 			return base, nil
 		}
 		return base, []string{fmt.Sprintf("%s: %v", path, err)}
 	}
 
-	var warnings []string
-	for _, k := range md.Undecoded() {
-		warnings = append(warnings, fmt.Sprintf("%s: unknown key %q", path, k.String()))
-	}
+	cfg := base
+	warnings := applyKeys(path, doc, &cfg)
 
 	if inc := cfg.ConfigFile; inc != "" {
 		target := expandPath(inc)
@@ -238,13 +243,66 @@ func readConfigFile(path string, base config, depth int, seen map[string]bool) (
 		}
 		included, includedWarnings := readConfigFile(target, defaultConfig(), depth+1, seen)
 		warnings = append(warnings, includedWarnings...)
-		// path parsed once already, so the second decode cannot fail; it
-		// re-applies this file's own keys on top of the included settings.
+		// Re-apply this file's own keys on top of the included settings;
+		// its warnings were already collected above.
 		cfg = included
-		_, _ = toml.DecodeFile(path, &cfg)
+		_ = applyKeys(path, doc, &cfg)
 	}
 
 	return cfg, warnings
+}
+
+// applyKeys decodes doc over cfg one key at a time, so `width = "1000"` costs
+// only window.width instead of every setting in the file. Each key is
+// re-encoded as a one-key document and decoded on its own; a type mismatch
+// keeps the value already in cfg, and an unknown key is reported.
+func applyKeys(path string, doc map[string]any, cfg *config) []string {
+	var warnings []string
+	for _, top := range sortedKeys(doc) {
+		v := doc[top]
+		table, isTable := v.(map[string]any)
+		if !isTable {
+			warnings = append(warnings, decodeKey(path, top, map[string]any{top: v}, cfg)...)
+			continue
+		}
+		if len(table) == 0 {
+			warnings = append(warnings, decodeKey(path, top, map[string]any{top: table}, cfg)...)
+		}
+		for _, k := range sortedKeys(table) {
+			one := map[string]any{top: map[string]any{k: table[k]}}
+			warnings = append(warnings, decodeKey(path, top+"."+k, one, cfg)...)
+		}
+	}
+	return warnings
+}
+
+// decodeKey decodes the one-key document one over cfg, leaving cfg untouched
+// when the value does not fit the field.
+func decodeKey(path, name string, one map[string]any, cfg *config) []string {
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).Encode(one); err != nil {
+		return []string{fmt.Sprintf("%s: %s: %v", path, name, err)}
+	}
+	next := *cfg
+	md, err := toml.Decode(buf.String(), &next)
+	if err != nil {
+		return []string{fmt.Sprintf("%s: %s has the wrong type; using the default", path, name)}
+	}
+	var warnings []string
+	for _, k := range md.Undecoded() {
+		warnings = append(warnings, fmt.Sprintf("%s: unknown key %q", path, k.String()))
+	}
+	*cfg = next
+	return warnings
+}
+
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // normalize repairs values that cannot reach go-gui/go-term intact, returning
@@ -308,10 +366,23 @@ func normalize(c *config) []string {
 	if c.Terminal.Dir != "" {
 		dir := expandPath(c.Terminal.Dir)
 		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-			warn("terminal.dir %q is not a directory; using the home directory", c.Terminal.Dir)
+			warn("terminal.dir %q is not a directory; using the default start directory", c.Terminal.Dir)
 			c.Terminal.Dir = ""
 		} else {
 			c.Terminal.Dir = dir
+		}
+	}
+
+	// A shell that cannot be found would make the window close the moment it
+	// opens, so it is checked here and the login shell used instead. A bare
+	// name resolves against this process's PATH, which for a Finder launch is
+	// launchd's minimal one, so an absolute path is the reliable spelling.
+	if c.Terminal.Shell != "" {
+		if sh, err := exec.LookPath(expandPath(c.Terminal.Shell)); err != nil {
+			warn("terminal.shell %q is not an executable; using the login shell", c.Terminal.Shell)
+			c.Terminal.Shell = ""
+		} else {
+			c.Terminal.Shell = sh
 		}
 	}
 
@@ -319,15 +390,15 @@ func normalize(c *config) []string {
 	// fall back to the built-in default and name the command that lists the
 	// valid spellings.
 	if c.Theme.Name != "" {
-		name, ok := canonicalThemeName(c.Theme.Name)
+		nt, ok := lookupTheme(c.Theme.Name)
 		switch {
 		case !ok:
 			warn("theme.name %q is not a bundled theme; using %q (see `termiz themes`)", c.Theme.Name, themeNameDefault)
 			c.Theme.Name = ""
-		case name == themeNameDefault:
+		case nt.Name == themeNameDefault:
 			c.Theme.Name = ""
 		default:
-			c.Theme.Name = name
+			c.Theme.Name = nt.Name
 		}
 	}
 

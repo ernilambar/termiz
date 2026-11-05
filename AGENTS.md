@@ -48,20 +48,25 @@ go build ./...
   result defers to `go-term`'s fallback. Never substitute `/bin/sh`, and never
   add platform branches without a matching `runtime.GOOS` guard. A
   `terminal.shell` in the config file outranks `$SHELL` by design; that
-  precedence lives in `shellSpec`, not in `loginShell`.
+  precedence lives in `shellSpec`, not in `loginShell`. On macOS the shell is
+  started with `-l` (`shellArgs`) so `~/.zprofile` runs on a Dock launch.
 - Configuration is read by the loader, never written with values. `defaultConfig` in
   `config.go` is the only place the built-in values live, and `launch` takes
   every window and terminal value from the loaded struct instead of a literal.
-  Loading is forgiving on purpose: a missing file means defaults, and a
-  malformed file, unknown key or out-of-range value is logged and replaced by
-  its default rather than failing startup. A file that does not parse is
-  ignored whole.
+  Loading is forgiving on purpose: a missing file means defaults, and an
+  unknown key, a wrong-typed value or an out-of-range value is logged and
+  replaced by its default rather than failing startup; `applyKeys` decodes one
+  key at a time so a bad value costs only that key. A file with a syntax error
+  is ignored whole. `terminal.shell` is resolved with `exec.LookPath` and a
+  missing shell falls back to the login shell.
   `config_file` loads another file as the base, so settings can live outside
   `~/.config`: the including file is decoded on top, a relative target resolves
   against the including file's directory, and a missing target, a cycle or a
   chain deeper than `maxConfigIncludes` is a warning, not an error.
 - `Termiz > Settings` (`menu.go`) opens the config in `$VISUAL`,
-  then `$EDITOR`, and otherwise in the system text editor. The item belongs in
+  then `$EDITOR`, and otherwise in the system text editor. A terminal editor
+  (`isTerminalEditor`) counts as unset because the app has no TTY to give it.
+  The item belongs in
   the app menu, but go-gui's native app menu has no slot for app-defined items:
   `installMenubar` declares a throwaway top-level menu and
   `moveMenuItemsIntoAppMenu` (`menu_darwin.go`, cgo; `menu_other.go` is the
@@ -79,26 +84,28 @@ go build ./...
   files in step, and never let the stub need cgo.
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
-  the `defer` in `main`, so closing the window tears down the PTY.
+  the `defer` in `launch`, so closing the window tears down the PTY.
 - Comment any non-obvious platform or lifecycle behavior in place (both
   `main` and `loginShell` carry such comments); do not add comments that merely
   restate the code.
 - `appinfo.toml` holds the app ID and display name: `main.go` embeds it for the
   running app and `cmd/buildapp` reads the same file when packaging the bundle,
   so the two identities cannot diverge. `name` is the only place the display
-  name is spelled; the scripts and workflow read it from there. The release
-  version comes from the git tag through `-version`; do not add a version to the
+  name is spelled; the scripts and workflow read it from there. The version is
+  `const version` in `main.go`, passed to buildapp as `-version`; the release
+  workflow fails when the tag does not match it. Do not add a version to the
   manifest.
 - The icon lives in `assets/`: `icon.svg` is the editable source and `icon.png`
   is the committed 1024×1024 full-bleed opaque render. macOS 26 and later mask
   it to the app-icon squircle; a transparent canvas makes the system draw its
   legacy gray plate behind the artwork instead. `appinfo.toml` names the PNG so
   `buildapp` converts it to `Contents/Resources/termiz.icns` (`sips` +
-  `iconutil`) without an icon flag, and `main.go` embeds the same bytes as
-  `gui.WindowCfg.IconPNG` because go-gui substitutes its own default Dock icon
-  when that field is empty. Redraw the SVG and re-render the PNG at 1024×1024,
-  keeping the canvas opaque; keep the file name, which the packaging path and
-  the embed assume.
+  `iconutil`) without an icon flag. `main.go` embeds `icon-dock.png` (from
+  `icon-dock.svg`: the same artwork pre-rounded on the 824px grid) as
+  `gui.WindowCfg.IconPNG`, because the Dock draws that image unmasked and go-gui
+  substitutes its own default Dock icon when the field is empty. Redraw both
+  SVGs and re-render both PNGs at 1024×1024, keeping `icon.png` opaque; keep
+  the file names, which the packaging path and the embed assume.
 - Theming goes through go-term's bundled corpus: `theme.name` is matched
   case-insensitively by `theme.go`, the resolved theme is passed as
   `Cfg.Themes[0]` so the spawned child's `COLORFGBG` agrees, and the go-gui
@@ -111,7 +118,7 @@ go build ./...
   and flushes it in `rememberDir`, which must run before `tm.Close()` while the
   shell is still alive. `terminal.dir` pins the start directory and suppresses
   both writes. The directory is the shell's OSC 7 report (`cwdLocalPath`,
-  percent-decoded) when it emits one, else the shell process cwd
+  percent-decoded, a remote host ignored) when it emits one, else the shell process cwd
   (`cwd_darwin.go` via libproc, `cwd_linux.go` via /proc, `cwd_other.go` stub).
   Keep the state write atomic and the file 0600.
 - Do not introduce external dependencies without updating `go.mod`/`go.sum`

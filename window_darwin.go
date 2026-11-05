@@ -25,7 +25,8 @@ static void termizZoomWindow(void) {
 			}
 		}
 	}
-	if (win != nil) {
+	// zoom: toggles, so an already-zoomed window would shrink back.
+	if (win != nil && ![win isZoomed]) {
 		[win zoom:nil];
 	}
 }

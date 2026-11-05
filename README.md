@@ -123,15 +123,17 @@ directory of the file that names it, and `~` and `$VAR` expand. A missing
 target, a cycle, or a chain more than 8 files deep is logged and skipped; the
 rest of the file still applies.
 
-`Termiz > Settings` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
-this file with it; when neither is set the default text editor opens it. The
+`Termiz > Settings…` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
+this file with it; when neither is set, or the editor is a terminal one such as
+vim or nano, the default text editor opens it. The
 directory is created when missing, and a missing file is created with a comment
 pointing at `docs/config.md`. The app never writes a setting, so the editor is
 the one that changes the contents.
 
 `terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
 window runs, and the child is given the matching `SHELL`. Leave it empty to
-keep the `$SHELL` → OS login shell resolution.
+keep the `$SHELL` → OS login shell resolution. On macOS the shell starts as a
+login shell, so `~/.zprofile` (Homebrew's `PATH` setup) runs.
 
 With `terminal.dir` empty the shell starts where the previous session ended,
 so quitting and reopening resumes in the same directory. termiz records the
@@ -141,7 +143,8 @@ when it changes, and again on close) in
 `XDG_STATE_HOME` is unset) and restores it on the next launch. Sampling is what
 keeps the directory when the shell exits on its own or the app is force-quit.
 The directory comes from the shell's OSC 7 report when it emits one — most
-shell integrations do — and otherwise from the shell process itself, so no
+shell integrations do; a report from a remote host over ssh is ignored — and
+otherwise from the shell process itself, so no
 shell setup is required. A first launch, or a saved directory that no longer
 exists, falls back to home. Naming `terminal.dir` pins the start directory:
 that value wins and the state file is not rewritten.

@@ -128,8 +128,12 @@ application can still change the shape, as vim does for insert mode. Setting
 `cursor_lock = true` makes the window drop those requests, so the configured
 shape and blink hold for the whole session.
 
-`shell` is taken literally as the program to run; use an absolute path to be
-unambiguous. A configured shell outranks `$SHELL`. When the chosen shell
+`shell` is the program to run. `~` and `$VAR` expand, and a bare name is
+looked up in `PATH` — but a Dock or Finder launch has launchd's minimal `PATH`,
+so use an absolute path to be unambiguous. A shell that cannot be found is
+logged and the login-shell resolution below applies instead. On macOS the
+shell starts as a login shell (`-l`), as Terminal.app does, so `~/.zprofile`
+runs. A configured shell outranks `$SHELL`. When the chosen shell
 differs from the inherited `$SHELL`, the child is given the matching `SHELL`,
 so subshells and tools that re-exec `$SHELL` agree with the window.
 
@@ -188,8 +192,9 @@ affected value is replaced by its default:
 | Problem | Result |
 | --- | --- |
 | Config file missing | All defaults. |
-| File does not parse | The whole file is ignored. |
+| File does not parse (syntax error) | The whole file is ignored. |
 | Unknown key | Logged; the key is ignored; other keys still apply. |
+| Wrong type (`width = "1000"`) | Logged; that value reverts to its default; other keys still apply. |
 | Out-of-range value | Logged; that value reverts to its default. |
 
 Repairs are reported once, after all files are merged, and do not name a
@@ -206,8 +211,9 @@ only when it changes; it is written once more at close, so a shell that exits
 on its own still leaves the last directory. Naming `terminal.dir` pins the
 start directory and stops the state write entirely.
 
-`Termiz > Settings` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
-the system text editor. It creates the config directory when missing and seeds
+`Termiz > Settings…` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
+the system text editor. A terminal editor (vim, nvim, nano, emacs, …) is
+skipped, because the app has no terminal to run it in. It creates the config directory when missing and seeds
 a missing file with a comment pointing at this reference page — the system
 editor also needs the path to exist. It never changes any value.
 

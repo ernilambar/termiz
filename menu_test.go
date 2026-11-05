@@ -182,3 +182,21 @@ func TestSeedConfig(t *testing.T) {
 		t.Errorf("existing content = %q, want %q untouched", got, existing)
 	}
 }
+
+func TestIsTerminalEditor(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"vim", true},
+		{"/opt/homebrew/bin/nvim", true},
+		{"nano -w", true},
+		{"code -w", false},
+		{"subl --wait", false},
+		{"", false},
+	} {
+		if got := isTerminalEditor(tc.in); got != tc.want {
+			t.Errorf("isTerminalEditor(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
