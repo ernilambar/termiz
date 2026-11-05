@@ -142,3 +142,7 @@ termiz themes | grep -i catppuccin
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
 checks a change must pass.
+
+## License
+
+[MIT](LICENSE) © Nilambar Sharma ([nilambar.net](https://nilambar.net/))
