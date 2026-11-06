@@ -1,0 +1,294 @@
+From 875677d0f693b4aaa7e5bd72c408337ff2b854c9 Mon Sep 17 00:00:00 2001
+From: Nilambar Sharma <nilambar@outlook.com>
+Date: Fri, 6 Nov 2026 21:54:26 +0545
+Subject: [PATCH 1/4] Add Cfg.LineHeight row-height multiplier
+
+---
+ term/settings.go               | 32 ++++++++++++++++++
+ term/widget_cfg.go             |  7 ++++
+ term/widget_draw.go            |  4 ++-
+ term/widget_draw_overlay.go    | 22 ++++++-------
+ term/widget_draw_text.go       |  4 +--
+ term/widget_lineheight_test.go | 59 ++++++++++++++++++++++++++++++++++
+ term/widget_state.go           |  5 +++
+ 7 files changed, 119 insertions(+), 14 deletions(-)
+ create mode 100644 term/widget_lineheight_test.go
+
+diff --git a/term/settings.go b/term/settings.go
+index aa3fb74..2b15bbb 100644
+--- a/term/settings.go
++++ b/term/settings.go
+@@ -150,6 +150,38 @@ func (t *Term) SetScrollbarWidth(px float32) {
+ 	t.queueCommand(func(w *gui.Window) { w.InvalidateLayout() })
+ }
+ 
++// MaxLineHeight is the largest Cfg.LineHeight honoured.
++const MaxLineHeight = 2
++
++// effectiveLineHeight maps Cfg.LineHeight to the multiplier applied to the
++// font height: anything non-finite or outside [1, MaxLineHeight] is 1.
++func effectiveLineHeight(v float32) float32 {
++	if !realNumber(v) || v < 1 || v > MaxLineHeight {
++		return 1
++	}
++	return v
++}
++
++// glyphHeight is the font's own line height. It falls back to cellH when
++// glyphH was never measured, so a Term built with only cellH set keeps
++// LineHeight 1 geometry.
++func (t *Term) glyphHeight() float32 {
++	if t.glyphH > 0 {
++		return t.glyphH
++	}
++	return t.cellH
++}
++
++// SetLineHeight changes the row-height multiplier, mirroring Cfg.LineHeight,
++// and forces a remeasure. Main-thread only.
++func (t *Term) SetLineHeight(v float32) {
++	if !realNumber(v) || t.cfg.LineHeight == v {
++		return
++	}
++	t.cfg.LineHeight = v
++	t.invalidateFontMetrics()
++}
++
+ // SetCursorStyle changes the shape the cursor is drawn in, mirroring
+ // Cfg.CursorStyle: it sets both the live shape and the default `reset`
+ // restores. An unrecognized value falls back to a block.
+diff --git a/term/widget_cfg.go b/term/widget_cfg.go
+index afc2140..1436aea 100644
+--- a/term/widget_cfg.go
++++ b/term/widget_cfg.go
+@@ -203,6 +203,13 @@ type Cfg struct {
+ 	// Zero (default) uses the built-in 4 px. Negative hides the scrollbar.
+ 	ScrollbarWidth float32
+ 
++	// LineHeight scales the row height relative to the font's own line
++	// height. Zero (default) or anything outside [1, MaxLineHeight] means
++	// 1.0. Glyphs are centred vertically in the taller row. Box-drawing
++	// characters are font glyphs, so values above 1 leave gaps between
++	// vertically adjacent ones.
++	LineHeight float32
++
+ 	// NotifyAfter fires a desktop notification when a command that ran at
+ 	// least this long finishes while the user is looking elsewhere — the
+ 	// window is in the background, or (under a pane manager) this pane is not
+diff --git a/term/widget_draw.go b/term/widget_draw.go
+index e1faca1..99d204f 100644
+--- a/term/widget_draw.go
++++ b/term/widget_draw.go
+@@ -233,7 +233,8 @@ func (t *Term) onDraw(dc *gui.DrawContext) {
+ 	style := t.style()
+ 	if t.cellW == 0 {
+ 		t.cellW = dc.TextWidth("M", style)
+-		t.cellH = dc.FontHeight(style)
++		t.glyphH = dc.FontHeight(style)
++		t.cellH = t.glyphH * effectiveLineHeight(t.cfg.LineHeight)
+ 	}
+ 	if !finite(t.cellW) || !finite(t.cellH) {
+ 		return
+@@ -246,6 +247,7 @@ func (t *Term) onDraw(dc *gui.DrawContext) {
+ 	if s := dc.Scale; s > 0 && realNumber(s) {
+ 		t.draw.pxScale = s
+ 	}
++	t.textDY = t.snapPx((t.cellH - t.glyphHeight()) / 2)
+ 	cols := clampDim(int(dc.Width / t.cellW))
+ 	rows := clampDim(int(dc.Height / t.cellH))
+ 	// One row of text, worst-case UTF-8; no-op when cap sufficient.
+diff --git a/term/widget_draw_overlay.go b/term/widget_draw_overlay.go
+index d33f0d4..6a1afab 100644
+--- a/term/widget_draw_overlay.go
++++ b/term/widget_draw_overlay.go
+@@ -230,7 +230,7 @@ func (t *Term) drawIME(ds *drawState) {
+ 	// composition glyph starts on a snapped cell origin, like the text pass.
+ 	col := g.CursorC
+ 	for i, r := range ds.imeRunes {
+-		ds.dc.Text(t.colX(col), rowY, t.termRuneStr(r), cs)
++		ds.dc.Text(t.colX(col), rowY+t.textDY, t.termRuneStr(r), cs)
+ 		col += ds.imeWidths[i]
+ 	}
+ 	t.drawUnderlineDecor(ds.dc, startX, rowY, stripW, ulSingle, cs.Color)
+@@ -555,7 +555,7 @@ func (t *Term) drawCursorShape(dc *gui.DrawContext, col, row int, cell cell,
+ 		cs := style
+ 		cs.Color = t.grid.bgOf(cell)
+ 		cs.EmojiBoxWidth = t.spanW(col, col+int(cell.Width))
+-		dc.Text(x, y, t.cellText(cell), cs)
++		dc.Text(x, y+t.textDY, t.cellText(cell), cs)
+ 	}
+ }
+ 
+@@ -565,22 +565,22 @@ func (t *Term) drawCursorShape(dc *gui.DrawContext, col, row int, cell cell,
+ // both, and the rule sits flush with the cell top — one thickness down, so
+ // it stays inside the row rather than bleeding into the row above.
+ func (t *Term) drawOverlineDecor(dc *gui.DrawContext, x, y, w float32, color gui.Color) {
+-	thick := t.cellH / 14
++	thick := t.glyphHeight() / 14
+ 	if thick < 1 {
+ 		thick = 1
+ 	}
+-	dc.FilledRect(x, y+thick, w, thick, color)
++	dc.FilledRect(x, y+t.textDY+thick, w, thick, color)
+ }
+ 
+ // drawUnderlineDecor renders underline decorations for a text run.
+ // x,y are the top-left of the run; w is its pixel width. Handles all
+ // ULStyle values including ulSingle (drawn as a rect so ulColor is honored).
+ func (t *Term) drawUnderlineDecor(dc *gui.DrawContext, x, y, w float32, ulStyle uint8, ulColor gui.Color) {
+-	thick := t.cellH / 14
++	thick := t.glyphHeight() / 14
+ 	if thick < 1 {
+ 		thick = 1
+ 	}
+-	baseY := y + t.cellH - 2*thick - 1
++	baseY := y + t.textDY + t.glyphHeight() - 2*thick - 1
+ 	switch ulStyle {
+ 	case ulSingle:
+ 		dc.FilledRect(x, baseY, w, thick, ulColor)
+@@ -769,7 +769,7 @@ func (t *Term) drawCopyCursor(ds *drawState) {
+ 	cs := ds.style
+ 	cs.Color = g.Theme.DefaultBG
+ 	cs.EmojiBoxWidth = t.spanW(cc, cc+int(cell.Width))
+-	ds.dc.Text(x, y, t.cellText(cell), cs)
++	ds.dc.Text(x, y+t.textDY, t.cellText(cell), cs)
+ }
+ 
+ // copyBarHint is the key cheatsheet shown in copy mode's status bar. The flat
+@@ -807,7 +807,7 @@ func (t *Term) drawCopyBar(ds *drawState) {
+ 	cs := ds.style
+ 	cs.Color = ds.g.ov.copyBarText
+ 	cs.Typeface = glyph.TypefaceRegular
+-	dc.Text(0, y, label, cs)
++	dc.Text(0, y+t.textDY, label, cs)
+ }
+ 
+ // drawSearchBar paints a status bar over the bottom cellH pixels of the
+@@ -834,7 +834,7 @@ func (t *Term) drawSearchBar(dc *gui.DrawContext, style gui.TextStyle) {
+ 	cs := style
+ 	cs.Color = t.grid.ov.searchText
+ 	cs.Typeface = glyph.TypefaceRegular
+-	dc.Text(0, y, label, cs)
++	dc.Text(0, y+t.textDY, label, cs)
+ }
+ 
+ // drawHints paints one label pill per hint target, anchored at the first
+@@ -923,10 +923,10 @@ func (t *Term) drawHints(ds *drawState) {
+ 		n := len(typed)
+ 		if n > 0 {
+ 			cs.Color = ds.g.ov.hintTypedText
+-			dc.Text(x, y, label[:n], cs)
++			dc.Text(x, y+t.textDY, label[:n], cs)
+ 		}
+ 		cs.Color = ds.g.ov.hintText
+-		dc.Text(x+float32(n)*t.cellW, y, label[n:], cs)
++		dc.Text(x+float32(n)*t.cellW, y+t.textDY, label[n:], cs)
+ 	}
+ }
+ 
+diff --git a/term/widget_draw_text.go b/term/widget_draw_text.go
+index 5945dd9..4c103d3 100644
+--- a/term/widget_draw_text.go
++++ b/term/widget_draw_text.go
+@@ -410,7 +410,7 @@ func (t *Term) flushRun(dc *gui.DrawContext, r int, style gui.TextStyle, yOff fl
+ 	cs.Strikethrough = fr.key.strikethrough
+ 	rowY := t.rowY(r, yOff)
+ 	runX := t.colX(fr.start)
+-	dc.Text(runX, rowY, text, cs)
++	dc.Text(runX, rowY+t.textDY, text, cs)
+ 	// Run width is only needed by the decorations, which most runs don't have.
+ 	if fr.key.ulStyle != ulNone || fr.key.overline {
+ 		runW := t.colX(fr.start+fr.cols) - runX
+@@ -441,7 +441,7 @@ func (t *Term) emitCell(dc *gui.DrawContext, x, y, w float32, cell cell, k runKe
+ 	// full reserved width (e.g. a width-2 emoji fills 2 cells) instead of the
+ 	// font's narrower natural emoji advance. Ignored for non-color glyphs.
+ 	cs.EmojiBoxWidth = w
+-	dc.Text(x, y, t.cellText(cell), cs)
++	dc.Text(x, y+t.textDY, t.cellText(cell), cs)
+ 	if k.ulStyle != ulNone {
+ 		t.drawUnderlineDecor(dc, x, y, w, k.ulStyle, k.ulColor)
+ 	}
+diff --git a/term/widget_lineheight_test.go b/term/widget_lineheight_test.go
+new file mode 100644
+index 0000000..dc25992
+--- /dev/null
++++ b/term/widget_lineheight_test.go
+@@ -0,0 +1,59 @@
++package term
++
++import (
++	"testing"
++
++	"github.com/go-gui-org/go-gui/gui"
++)
++
++func TestEffectiveLineHeight(t *testing.T) {
++	for _, tc := range []struct{ in, want float32 }{
++		{0, 1}, {0.5, 1}, {1, 1}, {1.25, 1.25}, {MaxLineHeight, MaxLineHeight}, {3, 1},
++	} {
++		if got := effectiveLineHeight(tc.in); got != tc.want {
++			t.Errorf("effectiveLineHeight(%v) = %v, want %v", tc.in, got, tc.want)
++		}
++	}
++}
++
++// A 1.5 line height on a 20px font makes 30px rows with each glyph centred,
++// 5px below the row top.
++func TestOnDraw_LineHeightCentresGlyphs(t *testing.T) {
++	g := newGrid(4, 8)
++	tm := &Term{grid: g, cmd: syncScheduler{}}
++	tm.cfg.LineHeight = 1.5
++	tm.focused.Store(true)
++	tm.mouse.hoverR.Store(-1)
++	tm.mouse.hoverC.Store(-1)
++	g.Mu.Lock()
++	g.CursorR, g.CursorC = 1, 0
++	g.Put('A')
++	g.Mu.Unlock()
++
++	dc := gui.NewDrawContext(80, 120, testTextMeasurer{cellW: 10, cellH: 20})
++	tm.onDraw(dc)
++
++	if tm.cellH != 30 {
++		t.Fatalf("cellH = %v, want 30", tm.cellH)
++	}
++	for _, tx := range dc.Texts() {
++		if tx.Text == "A" {
++			if tx.Y != 35 {
++				t.Errorf("glyph Y = %v, want 35 (row 1 at 30 + 5)", tx.Y)
++			}
++			return
++		}
++	}
++	t.Fatal("glyph not drawn")
++}
++
++func TestSetLineHeightRemeasures(t *testing.T) {
++	tm, _ := newDrawTerm(4, 8, 10, 20)
++	tm.SetLineHeight(1.2)
++	if tm.cellW != 0 {
++		t.Error("SetLineHeight did not invalidate cell metrics")
++	}
++	if tm.cfg.LineHeight != 1.2 {
++		t.Errorf("cfg.LineHeight = %v, want 1.2", tm.cfg.LineHeight)
++	}
++}
+diff --git a/term/widget_state.go b/term/widget_state.go
+index 6da2132..7ecc112 100644
+--- a/term/widget_state.go
++++ b/term/widget_state.go
+@@ -457,6 +457,11 @@ type Term struct {
+ 	// zero until the first OnDraw.
+ 	cellW, cellH float32
+ 
++	// glyphH is the font's own line height and textDY the snapped offset
++	// that centres a glyph of that height in a cellH-tall row. They differ
++	// from cellH only when Cfg.LineHeight is above 1.
++	glyphH, textDY float32
++
+ 	// fontSize is the effective font size in points. Zero means "use the
+ 	// configured TextStyle.Size." Adjusted via Cmd+=/Cmd+- and clamped to
+ 	// [4, 72] pt.
+-- 
+2.54.0 (Apple Git-157)
+

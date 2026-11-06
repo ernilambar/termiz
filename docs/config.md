@@ -96,7 +96,7 @@ A `min_width`/`min_height` larger than the opening size is lowered to
 | --- | --- | --- | --- |
 | `family` | string | `"Menlo"` | Font family name. An empty value quietly falls back to the default. |
 | `size` | number | `12` | Point size, from 6 through 72 inclusive. |
-| `line_height` | number | `1.0` | Row height as a multiple of the font's own, from 1.0 through 2.0. Glyphs are centred in the taller row. Box-drawing characters (tmux borders, TUI frames) show gaps between rows above 1.0. Out of range is logged and replaced by 1.0. |
+| `line_height` | number | `1.0` | Row height as a multiple of the font's own, from 1.0 through 2.0. Glyphs are centred in the taller row; box-drawing and block characters still join across rows. Out of range is logged and replaced by 1.0. |
 
 The size range is a usability bound: below 6 points text is unreadable, above
 72 a single cell no longer fits the 24×80 grid the PTY starts with. A value

@@ -113,8 +113,7 @@ type fontConfig struct {
 	Family string  `toml:"family"`
 	Size   float64 `toml:"size"`
 	// LineHeight scales the row height; glyphs stay centred in the taller
-	// row. Box-drawing characters are font glyphs in go-term, so above 1.0
-	// they show gaps between rows.
+	// row.
 	LineHeight float64 `toml:"line_height"`
 }
 

@@ -1,0 +1,818 @@
+From 8e6ff1c874782c2c95c06017bb2a9cf2e77b6052 Mon Sep 17 00:00:00 2001
+From: Nilambar Sharma <nilambar@outlook.com>
+Date: Fri, 6 Nov 2026 22:12:30 +0545
+Subject: [PATCH 2/4] Draw box-drawing and block elements as cell geometry
+
+---
+ term/widget_draw_box.go      | 493 +++++++++++++++++++++++++++++++++++
+ term/widget_draw_box_test.go | 152 +++++++++++
+ term/widget_draw_overlay.go  |   8 +-
+ term/widget_draw_test.go     |   4 +-
+ term/widget_draw_text.go     |  30 ++-
+ 5 files changed, 672 insertions(+), 15 deletions(-)
+ create mode 100644 term/widget_draw_box.go
+ create mode 100644 term/widget_draw_box_test.go
+
+diff --git a/term/widget_draw_box.go b/term/widget_draw_box.go
+new file mode 100644
+index 0000000..3b5ab50
+--- /dev/null
++++ b/term/widget_draw_box.go
+@@ -0,0 +1,493 @@
++package term
++
++import (
++	"math"
++
++	"github.com/go-gui-org/go-gui/gui"
++)
++
++// Built-in box drawing.
++//
++// Box Drawing (U+2500–257F) and Block Elements (U+2580–259F) are painted as
++// geometry sized to the cell instead of as font glyphs. A font's glyph is only
++// as tall as the font, so with Cfg.LineHeight above 1 — or with a font whose
++// box glyphs stop short of the line height — vertical strokes and blocks leave
++// a gap between rows. Geometry always reaches the cell edges, so adjacent
++// cells join at any line height.
++
++// Arm weights, one per direction out of the cell centre.
++const (
++	armNone uint8 = iota
++	armLight
++	armHeavy
++	armDouble
++)
++
++// boxArms holds the up, right, down, left weights of each line-drawing
++// character, indexed by r-0x2500. A zero entry is drawn by a special case
++// (dashes, arcs, diagonals) in drawBoxLine.
++var boxArms = [0x80][4]uint8{
++	0x00: {0, 1, 0, 1}, // ─
++	0x01: {0, 2, 0, 2}, // ━
++	0x02: {1, 0, 1, 0}, // │
++	0x03: {2, 0, 2, 0}, // ┃
++	0x0C: {0, 1, 1, 0}, // ┌
++	0x0D: {0, 2, 1, 0}, // ┍
++	0x0E: {0, 1, 2, 0}, // ┎
++	0x0F: {0, 2, 2, 0}, // ┏
++	0x10: {0, 0, 1, 1}, // ┐
++	0x11: {0, 0, 1, 2}, // ┑
++	0x12: {0, 0, 2, 1}, // ┒
++	0x13: {0, 0, 2, 2}, // ┓
++	0x14: {1, 1, 0, 0}, // └
++	0x15: {1, 2, 0, 0}, // ┕
++	0x16: {2, 1, 0, 0}, // ┖
++	0x17: {2, 2, 0, 0}, // ┗
++	0x18: {1, 0, 0, 1}, // ┘
++	0x19: {1, 0, 0, 2}, // ┙
++	0x1A: {2, 0, 0, 1}, // ┚
++	0x1B: {2, 0, 0, 2}, // ┛
++	0x1C: {1, 1, 1, 0}, // ├
++	0x1D: {1, 2, 1, 0}, // ┝
++	0x1E: {2, 1, 1, 0}, // ┞
++	0x1F: {1, 1, 2, 0}, // ┟
++	0x20: {2, 1, 2, 0}, // ┠
++	0x21: {2, 2, 1, 0}, // ┡
++	0x22: {1, 2, 2, 0}, // ┢
++	0x23: {2, 2, 2, 0}, // ┣
++	0x24: {1, 0, 1, 1}, // ┤
++	0x25: {1, 0, 1, 2}, // ┥
++	0x26: {2, 0, 1, 1}, // ┦
++	0x27: {1, 0, 2, 1}, // ┧
++	0x28: {2, 0, 2, 1}, // ┨
++	0x29: {2, 0, 1, 2}, // ┩
++	0x2A: {1, 0, 2, 2}, // ┪
++	0x2B: {2, 0, 2, 2}, // ┫
++	0x2C: {0, 1, 1, 1}, // ┬
++	0x2D: {0, 1, 1, 2}, // ┭
++	0x2E: {0, 2, 1, 1}, // ┮
++	0x2F: {0, 2, 1, 2}, // ┯
++	0x30: {0, 1, 2, 1}, // ┰
++	0x31: {0, 1, 2, 2}, // ┱
++	0x32: {0, 2, 2, 1}, // ┲
++	0x33: {0, 2, 2, 2}, // ┳
++	0x34: {1, 1, 0, 1}, // ┴
++	0x35: {1, 1, 0, 2}, // ┵
++	0x36: {1, 2, 0, 1}, // ┶
++	0x37: {1, 2, 0, 2}, // ┷
++	0x38: {2, 1, 0, 1}, // ┸
++	0x39: {2, 1, 0, 2}, // ┹
++	0x3A: {2, 2, 0, 1}, // ┺
++	0x3B: {2, 2, 0, 2}, // ┻
++	0x3C: {1, 1, 1, 1}, // ┼
++	0x3D: {1, 1, 1, 2}, // ┽
++	0x3E: {1, 2, 1, 1}, // ┾
++	0x3F: {1, 2, 1, 2}, // ┿
++	0x40: {2, 1, 1, 1}, // ╀
++	0x41: {1, 1, 2, 1}, // ╁
++	0x42: {2, 1, 2, 1}, // ╂
++	0x43: {2, 1, 1, 2}, // ╃
++	0x44: {2, 2, 1, 1}, // ╄
++	0x45: {1, 1, 2, 2}, // ╅
++	0x46: {1, 2, 2, 1}, // ╆
++	0x47: {2, 2, 1, 2}, // ╇
++	0x48: {1, 2, 2, 2}, // ╈
++	0x49: {2, 1, 2, 2}, // ╉
++	0x4A: {2, 2, 2, 1}, // ╊
++	0x4B: {2, 2, 2, 2}, // ╋
++	0x50: {0, 3, 0, 3}, // ═
++	0x51: {3, 0, 3, 0}, // ║
++	0x52: {0, 3, 1, 0}, // ╒
++	0x53: {0, 1, 3, 0}, // ╓
++	0x54: {0, 3, 3, 0}, // ╔
++	0x55: {0, 0, 1, 3}, // ╕
++	0x56: {0, 0, 3, 1}, // ╖
++	0x57: {0, 0, 3, 3}, // ╗
++	0x58: {1, 3, 0, 0}, // ╘
++	0x59: {3, 1, 0, 0}, // ╙
++	0x5A: {3, 3, 0, 0}, // ╚
++	0x5B: {1, 0, 0, 3}, // ╛
++	0x5C: {3, 0, 0, 1}, // ╜
++	0x5D: {3, 0, 0, 3}, // ╝
++	0x5E: {1, 3, 1, 0}, // ╞
++	0x5F: {3, 1, 3, 0}, // ╟
++	0x60: {3, 3, 3, 0}, // ╠
++	0x61: {1, 0, 1, 3}, // ╡
++	0x62: {3, 0, 3, 1}, // ╢
++	0x63: {3, 0, 3, 3}, // ╣
++	0x64: {0, 3, 1, 3}, // ╤
++	0x65: {0, 1, 3, 1}, // ╥
++	0x66: {0, 3, 3, 3}, // ╦
++	0x67: {1, 3, 0, 3}, // ╧
++	0x68: {3, 1, 0, 1}, // ╨
++	0x69: {3, 3, 0, 3}, // ╩
++	0x6A: {1, 3, 1, 3}, // ╪
++	0x6B: {3, 1, 3, 1}, // ╫
++	0x6C: {3, 3, 3, 3}, // ╬
++	0x74: {0, 0, 0, 1}, // ╴
++	0x75: {1, 0, 0, 0}, // ╵
++	0x76: {0, 1, 0, 0}, // ╶
++	0x77: {0, 0, 1, 0}, // ╷
++	0x78: {0, 0, 0, 2}, // ╸
++	0x79: {2, 0, 0, 0}, // ╹
++	0x7A: {0, 2, 0, 0}, // ╺
++	0x7B: {0, 0, 2, 0}, // ╻
++	0x7C: {0, 2, 0, 1}, // ╼
++	0x7D: {1, 0, 2, 0}, // ╽
++	0x7E: {0, 1, 0, 2}, // ╾
++	0x7F: {2, 0, 1, 0}, // ╿
++}
++
++// Directions into a boxArms entry.
++const (
++	dirUp = iota
++	dirRight
++	dirDown
++	dirLeft
++)
++
++// boxPainter paints one cell. Every edge it fills is snapped to the device
++// pixel grid, so strokes stay crisp and neighbouring cells meet exactly.
++type boxPainter struct {
++	t          *Term
++	dc         *gui.DrawContext
++	x, y, w, h float32
++	cx, cy     float32 // cell centre
++	lt, ht     float32 // light and heavy stroke thickness
++	color      gui.Color
++}
++
++// drawBuiltinGlyph paints r into the cell box (x, y, w, h) as geometry and
++// reports whether it did. A false return means r is not built in and the
++// caller draws the font glyph.
++func (t *Term) drawBuiltinGlyph(dc *gui.DrawContext, x, y, w, h float32, r rune, color gui.Color) bool {
++	if r < 0x2500 || r > 0x259F || w <= 0 || h <= 0 {
++		return false
++	}
++	dp := float32(1)
++	if t.draw.pxScale > 0 {
++		dp = 1 / t.draw.pxScale
++	}
++	lt := max(t.snapPx(t.glyphHeight()/14), dp)
++	p := boxPainter{
++		t: t, dc: dc, x: x, y: y, w: w, h: h,
++		cx: x + w/2, cy: y + h/2,
++		lt: lt, ht: 2 * lt,
++		color: color,
++	}
++	if r >= 0x2580 {
++		return p.block(r)
++	}
++	return p.line(r)
++}
++
++// fill paints the rectangle [x0, x1) × [y0, y1), snapping each edge and
++// widening a span that snapped to nothing to one device pixel.
++func (p *boxPainter) fill(x0, y0, x1, y1 float32, c gui.Color) {
++	sx0, sx1 := p.t.snapPx(x0), p.t.snapPx(x1)
++	sy0, sy1 := p.t.snapPx(y0), p.t.snapPx(y1)
++	dp := float32(1)
++	if p.t.draw.pxScale > 0 {
++		dp = 1 / p.t.draw.pxScale
++	}
++	if sx1-sx0 < dp {
++		sx1 = sx0 + dp
++	}
++	if sy1-sy0 < dp {
++		sy1 = sy0 + dp
++	}
++	p.dc.FilledRect(sx0, sy0, sx1-sx0, sy1-sy0, c)
++}
++
++// hStroke fills a horizontal stroke of thickness th centred on y.
++func (p *boxPainter) hStroke(x0, x1, y, th float32) {
++	p.fill(x0, y-th/2, x1, y+th/2, p.color)
++}
++
++// vStroke fills a vertical stroke of thickness th centred on x.
++func (p *boxPainter) vStroke(x, y0, y1, th float32) {
++	p.fill(x-th/2, y0, x+th/2, y1, p.color)
++}
++
++func (p *boxPainter) thickness(weight uint8) float32 {
++	if weight == armHeavy {
++		return p.ht
++	}
++	return p.lt
++}
++
++func (p *boxPainter) line(r rune) bool {
++	i := r - 0x2500
++	switch {
++	case i >= 0x04 && i <= 0x0B:
++		// ┄┅┆┇ triple dashes, ┈┉┊┋ quadruple; light/heavy alternate and
++		// horizontal/vertical alternate in pairs.
++		n := 3
++		if i >= 0x08 {
++			n = 4
++		}
++		p.dashes(n, (i/2)%2 == 1, i%2 == 1)
++		return true
++	case i >= 0x4C && i <= 0x4F:
++		p.dashes(2, i >= 0x4E, i%2 == 1) // ╌╍╎╏
++		return true
++	case i >= 0x6D && i <= 0x70:
++		p.arc(i - 0x6D) // ╭╮╯╰
++		return true
++	case i >= 0x71 && i <= 0x73:
++		if i != 0x72 {
++			p.diagonal(true) // ╱ and half of ╳
++		}
++		if i != 0x71 {
++			p.diagonal(false) // ╲ and half of ╳
++		}
++		return true
++	}
++	arms := boxArms[i]
++	if arms == [4]uint8{} {
++		return false
++	}
++	p.arms(arms)
++	return true
++}
++
++// dashes draws n evenly spaced segments across the cell, vertical or
++// horizontal, light or heavy.
++func (p *boxPainter) dashes(n int, vertical, heavy bool) {
++	th := p.lt
++	if heavy {
++		th = p.ht
++	}
++	span := p.w
++	if vertical {
++		span = p.h
++	}
++	step := span / float32(n)
++	gap := step * 0.3
++	for k := range n {
++		a := float32(k)*step + gap/2
++		b := float32(k+1)*step - gap/2
++		if vertical {
++			p.vStroke(p.cx, p.y+a, p.y+b, th)
++		} else {
++			p.hStroke(p.x+a, p.x+b, p.cy, th)
++		}
++	}
++}
++
++// arms draws a line-drawing character from its four arm weights.
++//
++// Light and heavy arms run from the edge to the centre, overlapping the
++// perpendicular stroke so the join is solid. A double arm is two light strokes
++// offset by ±d; where it meets other doubles each stroke stops at the near or
++// far perpendicular stroke so corners and tees close the way fonts draw them
++// (╔ ╦ ╬). A single arm meeting a double pair stops on the near stroke of a
++// tee (╟) and runs to the far stroke of a corner (╓).
++func (p *boxPainter) arms(a [4]uint8) {
++	d := p.lt
++	up, right, down, left := a[dirUp], a[dirRight], a[dirDown], a[dirLeft]
++
++	// Thickness of the solid vertical / horizontal stroke through the
++	// centre, which single arms of the other axis overlap.
++	var vt, ht float32
++	for _, w := range []uint8{up, down} {
++		if w == armLight || w == armHeavy {
++			vt = max(vt, p.thickness(w))
++		}
++	}
++	for _, w := range []uint8{left, right} {
++		if w == armLight || w == armHeavy {
++			ht = max(ht, p.thickness(w))
++		}
++	}
++
++	// singleEnd is how far past the centre (toward the opposite side) a
++	// single arm reaches. perpA/perpB are the perpendicular arms, opp the
++	// opposite one, solid the solid perpendicular thickness.
++	singleEnd := func(th float32, perpA, perpB, opp uint8, solid float32) float32 {
++		da, db := perpA == armDouble, perpB == armDouble
++		switch {
++		case da && db && opp == armNone:
++			return -d + p.lt/2 // tee into a double pair: near stroke
++		case (da || db) && opp == armNone:
++			return d + p.lt/2 // corner into a double pair: far stroke
++		case solid > 0:
++			return solid / 2
++		default:
++			return th / 2
++		}
++	}
++	// doubleEnd is the same for one stroke of a double arm: near is the
++	// perpendicular arm on this stroke's side, far the other one.
++	doubleEnd := func(near, far uint8, solid float32) float32 {
++		switch {
++		case near == armDouble:
++			return -d + p.lt/2
++		case far == armDouble:
++			return d + p.lt/2
++		case solid > 0:
++			return solid / 2
++		default:
++			return p.lt / 2
++		}
++	}
++
++	switch right {
++	case armLight, armHeavy:
++		th := p.thickness(right)
++		e := p.cx - singleEnd(th, up, down, left, vt)
++		p.hStroke(e, p.x+p.w, p.cy, th)
++	case armDouble:
++		p.hStroke(p.cx-doubleEnd(up, down, vt), p.x+p.w, p.cy-d, p.lt)
++		p.hStroke(p.cx-doubleEnd(down, up, vt), p.x+p.w, p.cy+d, p.lt)
++	}
++	switch left {
++	case armLight, armHeavy:
++		th := p.thickness(left)
++		e := p.cx + singleEnd(th, up, down, right, vt)
++		p.hStroke(p.x, e, p.cy, th)
++	case armDouble:
++		p.hStroke(p.x, p.cx+doubleEnd(up, down, vt), p.cy-d, p.lt)
++		p.hStroke(p.x, p.cx+doubleEnd(down, up, vt), p.cy+d, p.lt)
++	}
++	switch down {
++	case armLight, armHeavy:
++		th := p.thickness(down)
++		e := p.cy - singleEnd(th, left, right, up, ht)
++		p.vStroke(p.cx, e, p.y+p.h, th)
++	case armDouble:
++		p.vStroke(p.cx-d, p.cy-doubleEnd(left, right, ht), p.y+p.h, p.lt)
++		p.vStroke(p.cx+d, p.cy-doubleEnd(right, left, ht), p.y+p.h, p.lt)
++	}
++	switch up {
++	case armLight, armHeavy:
++		th := p.thickness(up)
++		e := p.cy + singleEnd(th, left, right, down, ht)
++		p.vStroke(p.cx, p.y, e, th)
++	case armDouble:
++		p.vStroke(p.cx-d, p.y, p.cy+doubleEnd(left, right, ht), p.lt)
++		p.vStroke(p.cx+d, p.y, p.cy+doubleEnd(right, left, ht), p.lt)
++	}
++}
++
++// arc draws a rounded corner: 0 ╭, 1 ╮, 2 ╯, 3 ╰. A quarter circle of
++// radius half the cell width joins the centre lines, and a straight stroke
++// carries the vertical end to the cell edge when the cell is taller than wide.
++func (p *boxPainter) arc(k rune) {
++	rad := min(p.w, p.h) / 2
++	// sx/sy point from the centre toward the two edges the arc reaches.
++	sx, sy := float32(1), float32(1)
++	switch k {
++	case 1:
++		sx = -1
++	case 2:
++		sx, sy = -1, -1
++	case 3:
++		sy = -1
++	}
++	// Arc centre sits diagonally off the cell centre toward both edges.
++	ax, ay := p.cx+sx*rad, p.cy+sy*rad
++	in, out := rad-p.lt/2, rad+p.lt/2
++	const segs = 12
++	var pts [8]float32
++	for s := range segs {
++		a0 := float64(s) / segs * math.Pi / 2
++		a1 := float64(s+1) / segs * math.Pi / 2
++		// Angle 0 points back at the cell centre's column (−sx), angle π/2
++		// back at its row (−sy).
++		c0, s0 := float32(math.Cos(a0)), float32(math.Sin(a0))
++		c1, s1 := float32(math.Cos(a1)), float32(math.Sin(a1))
++		pts = [8]float32{
++			ax - sx*in*c0, ay - sy*in*s0,
++			ax - sx*out*c0, ay - sy*out*s0,
++			ax - sx*out*c1, ay - sy*out*s1,
++			ax - sx*in*c1, ay - sy*in*s1,
++		}
++		p.dc.FilledPolygon(pts[:], p.color)
++	}
++	// Straight remainder of the vertical arm, from the arc's end to the edge.
++	// The arm along the cell's shorter side has no remainder; skip it rather
++	// than let fill widen an empty span into the neighbouring cell.
++	if sy > 0 && ay < p.y+p.h {
++		p.vStroke(p.cx, ay, p.y+p.h, p.lt)
++	} else if sy < 0 && ay > p.y {
++		p.vStroke(p.cx, p.y, ay, p.lt)
++	}
++	if sx > 0 && ax < p.x+p.w {
++		p.hStroke(ax, p.x+p.w, p.cy, p.lt)
++	} else if sx < 0 && ax > p.x {
++		p.hStroke(p.x, ax, p.cy, p.lt)
++	}
++}
++
++// diagonal draws ╱ (rising) or ╲ corner to corner.
++func (p *boxPainter) diagonal(rising bool) {
++	// Horizontal half-width that gives the stroke a perpendicular thickness
++	// of lt.
++	a := p.lt * float32(math.Hypot(float64(p.w), float64(p.h))) / (2 * p.h)
++	x0, x1 := p.x, p.x+p.w
++	top, bot := p.y, p.y+p.h
++	if rising {
++		p.dc.FilledPolygon([]float32{x0 - a, bot, x0 + a, bot, x1 + a, top, x1 - a, top}, p.color)
++	} else {
++		p.dc.FilledPolygon([]float32{x0 - a, top, x0 + a, top, x1 + a, bot, x1 - a, bot}, p.color)
++	}
++}
++
++// Quadrant bits for the U+2596–259F block elements.
++const (
++	quadUL = 1 << iota
++	quadUR
++	quadLL
++	quadLR
++)
++
++var blockQuads = [10]uint8{
++	quadLL,                   // ▖
++	quadLR,                   // ▗
++	quadUL,                   // ▘
++	quadUL | quadLL | quadLR, // ▙
++	quadUL | quadLR,          // ▚
++	quadUL | quadUR | quadLL, // ▛
++	quadUL | quadUR | quadLR, // ▜
++	quadUR,                   // ▝
++	quadUR | quadLL,          // ▞
++	quadUR | quadLL | quadLR, // ▟
++}
++
++func (p *boxPainter) block(r rune) bool {
++	x0, y0, x1, y1 := p.x, p.y, p.x+p.w, p.y+p.h
++	switch {
++	case r == 0x2580: // ▀
++		p.fill(x0, y0, x1, p.cy, p.color)
++	case r >= 0x2581 && r <= 0x2588: // ▁ … █, lower n/8
++		n := float32(r - 0x2580)
++		p.fill(x0, y1-p.h*n/8, x1, y1, p.color)
++	case r >= 0x2589 && r <= 0x258F: // ▉ … ▏, left n/8
++		n := float32(0x2590 - r)
++		p.fill(x0, y0, x0+p.w*n/8, y1, p.color)
++	case r == 0x2590: // ▐
++		p.fill(p.cx, y0, x1, y1, p.color)
++	case r >= 0x2591 && r <= 0x2593: // ░ ▒ ▓
++		p.fill(x0, y0, x1, y1, p.color.WithOpacity(float32(r-0x2590)/4))
++	case r == 0x2594: // ▔
++		p.fill(x0, y0, x1, y0+p.h/8, p.color)
++	case r == 0x2595: // ▕
++		p.fill(x1-p.w/8, y0, x1, y1, p.color)
++	default: // ▖ … ▟
++		q := blockQuads[r-0x2596]
++		if q&quadUL != 0 {
++			p.fill(x0, y0, p.cx, p.cy, p.color)
++		}
++		if q&quadUR != 0 {
++			p.fill(p.cx, y0, x1, p.cy, p.color)
++		}
++		if q&quadLL != 0 {
++			p.fill(x0, p.cy, p.cx, y1, p.color)
++		}
++		if q&quadLR != 0 {
++			p.fill(p.cx, p.cy, x1, y1, p.color)
++		}
++	}
++	return true
++}
+diff --git a/term/widget_draw_box_test.go b/term/widget_draw_box_test.go
+new file mode 100644
+index 0000000..76dd4a2
+--- /dev/null
++++ b/term/widget_draw_box_test.go
+@@ -0,0 +1,152 @@
++package term
++
++import (
++	"testing"
++
++	"github.com/go-gui-org/go-gui/gui"
++)
++
++// boxCell is the test cell box: 10×30 at the origin, tall like a row with
++// line height above 1, on a 2× display.
++const boxW, boxH = 10, 30
++
++func drawBox(t *testing.T, r rune) (*gui.DrawContext, bool) {
++	t.Helper()
++	tm := &Term{cellW: boxW, cellH: boxH, glyphH: 20}
++	tm.draw.pxScale = 2
++	dc := gui.NewDrawContext(boxW, boxH, nil)
++	ok := tm.drawBuiltinGlyph(dc, 0, 0, boxW, boxH, r, gui.RGB(255, 255, 255))
++	return dc, ok
++}
++
++// covered reports whether any filled triangle contains (px, py).
++func covered(dc *gui.DrawContext, px, py float32) bool {
++	for _, b := range dc.Batches() {
++		tr := b.Triangles
++		for i := 0; i+5 < len(tr); i += 6 {
++			if inTriangle(px, py, tr[i], tr[i+1], tr[i+2], tr[i+3], tr[i+4], tr[i+5]) {
++				return true
++			}
++		}
++	}
++	return false
++}
++
++func inTriangle(px, py, ax, ay, bx, by, cx, cy float32) bool {
++	d1 := (px-bx)*(ay-by) - (ax-bx)*(py-by)
++	d2 := (px-cx)*(by-cy) - (bx-cx)*(py-cy)
++	d3 := (px-ax)*(cy-ay) - (cx-ax)*(py-ay)
++	neg := d1 < 0 || d2 < 0 || d3 < 0
++	pos := d1 > 0 || d2 > 0 || d3 > 0
++	return !(neg && pos)
++}
++
++// Every table-driven character must reach exactly the cell edges its arms
++// name, so it joins its neighbours at any row height. Double arms are offset
++// from the centre line, so their edge probe is the centre ± the offset.
++func TestBuiltinBoxArmsReachEdges(t *testing.T) {
++	const lt = 1.5 // snapPx(20/14) at 2×
++	for i, arms := range boxArms {
++		if arms == [4]uint8{} {
++			continue
++		}
++		r := rune(0x2500 + i)
++		dc, ok := drawBox(t, r)
++		if !ok {
++			t.Errorf("%c: not built in", r)
++			continue
++		}
++		probes := [4][2]float32{
++			dirUp:    {boxW / 2, 0.25},
++			dirRight: {boxW - 0.25, boxH / 2},
++			dirDown:  {boxW / 2, boxH - 0.25},
++			dirLeft:  {0.25, boxH / 2},
++		}
++		for dir, p := range probes {
++			want := arms[dir] != armNone
++			hit := covered(dc, p[0], p[1])
++			if arms[dir] == armDouble {
++				// Centre must be empty between the two strokes; each stroke
++				// sits at ±lt.
++				if dir == dirUp || dir == dirDown {
++					hit = covered(dc, p[0]-lt, p[1]) && covered(dc, p[0]+lt, p[1]) && !hit
++				} else {
++					hit = covered(dc, p[0], p[1]-lt) && covered(dc, p[0], p[1]+lt) && !hit
++				}
++			}
++			if hit != want {
++				t.Errorf("%c: arm %d at edge = %v, want %v", r, dir, hit, want)
++			}
++		}
++	}
++}
++
++func TestBuiltinBoxSpecialLines(t *testing.T) {
++	for _, r := range []rune{'┄', '┆', '┈', '┊', '╌', '╎', '╭', '╮', '╯', '╰', '╱', '╲', '╳'} {
++		if dc, ok := drawBox(t, r); !ok || len(dc.Batches()) == 0 {
++			t.Errorf("%c: drawn = %v, batches = %d", r, ok, len(dc.Batches()))
++		}
++	}
++	// ╭ joins the cell's bottom and right edges and leaves the others bare.
++	dc, _ := drawBox(t, '╭')
++	if !covered(dc, boxW/2, boxH-0.25) || !covered(dc, boxW-0.25, boxH/2) {
++		t.Error("╭ does not reach the bottom and right edges")
++	}
++	if covered(dc, boxW/2, 0.25) || covered(dc, 0.25, boxH/2) {
++		t.Error("╭ reaches the top or left edge")
++	}
++}
++
++// Blocks fill the full row height, which is the point of building them in.
++func TestBuiltinBlocks(t *testing.T) {
++	cases := []struct {
++		r          rune
++		top, bot   bool // left-column samples near the top and bottom edge
++		left, rite bool // mid-row samples near the left and right edge
++	}{
++		{'█', true, true, true, true},
++		{'▀', true, false, false, false},
++		{'▄', false, true, true, true},
++		{'▌', true, true, true, false},
++		{'▐', false, false, false, true},
++		{'▘', true, false, false, false},
++		{'▟', false, true, true, true},
++	}
++	for _, c := range cases {
++		dc, ok := drawBox(t, c.r)
++		if !ok {
++			t.Errorf("%c: not built in", c.r)
++			continue
++		}
++		got := [4]bool{
++			covered(dc, 1, 0.25), covered(dc, 1, boxH-0.25),
++			covered(dc, 0.25, boxH*0.75), covered(dc, boxW-0.25, boxH*0.75),
++		}
++		want := [4]bool{c.top, c.bot, c.left, c.rite}
++		if got != want {
++			t.Errorf("%c: top/bottom/left/right = %v, want %v", c.r, got, want)
++		}
++	}
++}
++
++func TestBuiltinGlyphSkipsOthers(t *testing.T) {
++	for _, r := range []rune{'A', '■', 0x25FF, 0x24FF} {
++		if _, ok := drawBox(t, r); ok {
++			t.Errorf("%U drawn as built-in", r)
++		}
++	}
++}
++
++// The draw pass routes box characters to geometry, not text.
++func TestOnDraw_BoxCharIsGeometry(t *testing.T) {
++	tm, dc := newDrawTerm(4, 8, 10, 20)
++	tm.grid.Mu.Lock()
++	tm.grid.Put('│')
++	tm.grid.Mu.Unlock()
++	tm.onDraw(dc)
++	for _, tx := range dc.Texts() {
++		if tx.Text == "│" {
++			t.Fatal("│ drawn as font text")
++		}
++	}
++}
+diff --git a/term/widget_draw_overlay.go b/term/widget_draw_overlay.go
+index 6a1afab..fa67919 100644
+--- a/term/widget_draw_overlay.go
++++ b/term/widget_draw_overlay.go
+@@ -555,7 +555,7 @@ func (t *Term) drawCursorShape(dc *gui.DrawContext, col, row int, cell cell,
+ 		cs := style
+ 		cs.Color = t.grid.bgOf(cell)
+ 		cs.EmojiBoxWidth = t.spanW(col, col+int(cell.Width))
+-		dc.Text(x, y+t.textDY, t.cellText(cell), cs)
++		t.drawCellGlyph(dc, x, y, t.spanW(col, col+int(cell.Width)), ch, cell, cs)
+ 	}
+ }
+ 
+@@ -762,14 +762,14 @@ func (t *Term) drawCopyCursor(ds *drawState) {
+ 
+ 	// Steady, never blinking: it marks a position the user is aiming with, and
+ 	// a blinking target is harder to track than a still one.
+-	ds.dc.FilledRect(x, y, t.colX(cc+1)-x, t.rowY(vr+1, ds.renderYOff)-y,
+-		g.ov.copyCurFill)
++	h := t.rowY(vr+1, ds.renderYOff) - y
++	ds.dc.FilledRect(x, y, t.colX(cc+1)-x, h, g.ov.copyCurFill)
+ 
+ 	cell := maskGlyph(g.ViewCellAt(vr, cc), ds.blinkOff)
+ 	cs := ds.style
+ 	cs.Color = g.Theme.DefaultBG
+ 	cs.EmojiBoxWidth = t.spanW(cc, cc+int(cell.Width))
+-	ds.dc.Text(x, y+t.textDY, t.cellText(cell), cs)
++	t.drawCellGlyph(ds.dc, x, y, cs.EmojiBoxWidth, h, cell, cs)
+ }
+ 
+ // copyBarHint is the key cheatsheet shown in copy mode's status bar. The flat
+diff --git a/term/widget_draw_test.go b/term/widget_draw_test.go
+index b8c41e5..5ae4663 100644
+--- a/term/widget_draw_test.go
++++ b/term/widget_draw_test.go
+@@ -711,7 +711,7 @@ func TestEmitCell_Plain(t *testing.T) {
+ 	tm, dc := newDrawTerm(4, 8, 10, 20)
+ 	cell := cell{Ch: 'Z', Width: 1}
+ 	k := runKey{color: gui.RGB(255, 255, 255)}
+-	tm.emitCell(dc, 0, 0, 10, cell, k, gui.TextStyle{})
++	tm.emitCell(dc, 0, 0, 10, 20, cell, k, gui.TextStyle{})
+ 	texts := dc.Texts()
+ 	if len(texts) != 1 {
+ 		t.Fatalf("expected 1 text entry, got %d", len(texts))
+@@ -729,7 +729,7 @@ func TestEmitCell_WithUnderline(t *testing.T) {
+ 		ulStyle: ulSingle,
+ 		ulColor: gui.RGB(255, 255, 255),
+ 	}
+-	tm.emitCell(dc, 0, 0, 10, cell, k, gui.TextStyle{})
++	tm.emitCell(dc, 0, 0, 10, 20, cell, k, gui.TextStyle{})
+ 	if len(dc.Texts()) != 1 {
+ 		t.Error("expected 1 text entry for underline cell")
+ 	}
+diff --git a/term/widget_draw_text.go b/term/widget_draw_text.go
+index 4c103d3..df98f11 100644
+--- a/term/widget_draw_text.go
++++ b/term/widget_draw_text.go
+@@ -284,6 +284,7 @@ func (t *Term) drawFgPass(ds *drawState) {
+ 	// Partial top row: per-cell emit, no run coalescing.
+ 	if ds.partialRow != nil {
+ 		partialY := t.rowY(-1, yOff)
++		partialH := t.rowY(0, yOff) - partialY
+ 		for c := range cols {
+ 			cell := ds.partialRow[c]
+ 			if cell.Width == 0 && cell.Ch == 0 {
+@@ -298,7 +299,7 @@ func (t *Term) drawFgPass(ds *drawState) {
+ 			// land there (posToCell clamps to 0..Rows-1), so no URL highlight.
+ 			k := cellRunKey(cell, style, g, hR, hC, cmdHeld, false)
+ 			t.emitCell(dc, t.colX(c), partialY,
+-				t.spanW(c, c+int(cell.Width)), cell, k, style)
++				t.spanW(c, c+int(cell.Width)), partialH, cell, k, style)
+ 		}
+ 	}
+ 
+@@ -310,6 +311,7 @@ func (t *Term) drawFgPass(ds *drawState) {
+ 		// rowY is constant across the row: hoist it out of the per-cell
+ 		// emit path (each call pays a float64 Round plus a snap).
+ 		rowY := t.rowY(r, yOff)
++		rowH := t.rowY(r+1, yOff) - rowY
+ 		for c := range cols {
+ 			cell := ds.resolveVisual(r, c)
+ 			if cell.Width == 0 && cell.Ch == 0 {
+@@ -336,7 +338,7 @@ func (t *Term) drawFgPass(ds *drawState) {
+ 				t.flushRun(dc, r, style, yOff, &fr)
+ 				x := t.colX(c)
+ 				t.emitCell(dc, x, rowY,
+-					t.colX(c+int(cell.Width))-x, cell, k, style)
++					t.colX(c+int(cell.Width))-x, rowH, cell, k, style)
+ 				continue
+ 			}
+ 			// Non-ASCII glyphs may trigger font fallback with metrics
+@@ -350,7 +352,7 @@ func (t *Term) drawFgPass(ds *drawState) {
+ 				t.flushRun(dc, r, style, yOff, &fr)
+ 				x := t.colX(c)
+ 				t.emitCell(dc, x, rowY,
+-					t.colX(c+int(cell.Width))-x, cell, k, style)
++					t.colX(c+int(cell.Width))-x, rowH, cell, k, style)
+ 				continue
+ 			}
+ 			if isPlainSpace {
+@@ -427,11 +429,11 @@ func (t *Term) flushRun(dc *gui.DrawContext, r int, style gui.TextStyle, yOff fl
+ 	fr.cols = 0
+ }
+ 
+-// emitCell draws one cell's glyph at the pixel-snapped origin (x, y). w is the
+-// snapped width of the cell box (cell.Width columns), passed in rather than
+-// recomputed here so it is the difference of two snapped column origins and
+-// therefore tiles exactly with the neighbouring cells' boxes.
+-func (t *Term) emitCell(dc *gui.DrawContext, x, y, w float32, cell cell, k runKey, base gui.TextStyle) {
++// emitCell draws one cell's glyph at the pixel-snapped origin (x, y). w and h
++// are the snapped width (cell.Width columns) and height of the cell box, passed
++// in rather than recomputed here so each is the difference of two snapped
++// origins and therefore tiles exactly with the neighbouring cells' boxes.
++func (t *Term) emitCell(dc *gui.DrawContext, x, y, w, h float32, cell cell, k runKey, base gui.TextStyle) {
+ 	cs := base
+ 	cs.Color = k.color
+ 	cs.Typeface = k.typeface
+@@ -441,7 +443,7 @@ func (t *Term) emitCell(dc *gui.DrawContext, x, y, w float32, cell cell, k runKe
+ 	// full reserved width (e.g. a width-2 emoji fills 2 cells) instead of the
+ 	// font's narrower natural emoji advance. Ignored for non-color glyphs.
+ 	cs.EmojiBoxWidth = w
+-	dc.Text(x, y+t.textDY, t.cellText(cell), cs)
++	t.drawCellGlyph(dc, x, y, w, h, cell, cs)
+ 	if k.ulStyle != ulNone {
+ 		t.drawUnderlineDecor(dc, x, y, w, k.ulStyle, k.ulColor)
+ 	}
+@@ -450,6 +452,16 @@ func (t *Term) emitCell(dc *gui.DrawContext, x, y, w float32, cell cell, k runKe
+ 	}
+ }
+ 
++// drawCellGlyph draws a cell's glyph in the box (x, y, w, h) with style cs:
++// as built-in geometry when the character has one (widget_draw_box.go),
++// otherwise as font text centred in the row.
++func (t *Term) drawCellGlyph(dc *gui.DrawContext, x, y, w, h float32, cell cell, cs gui.TextStyle) {
++	if cell.clusterID == 0 && t.drawBuiltinGlyph(dc, x, y, w, h, cell.Ch, cs.Color) {
++		return
++	}
++	dc.Text(x, y+t.textDY, t.cellText(cell), cs)
++}
++
+ // lastRow says this run covers the whole bottom-most drawn row, the only run
+ // allowed to bleed downward — see bleedToEdge.
+ func (t *Term) fillRun(dc *gui.DrawContext, row, c0, c1 int, color gui.Color, yOff float32, lastRow bool) {
+-- 
+2.54.0 (Apple Git-157)
+
