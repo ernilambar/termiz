@@ -138,6 +138,14 @@ go build ./...
   (`cwd_darwin.go` via libproc).
   Keep the state write atomic and the file 0600.
 - Do not introduce external dependencies without updating `go.mod`/`go.sum`.
+- go-term is patched locally and never sent upstream: `go.mod` replaces it
+  with `third_party/go-term`, a generated copy of the tag in
+  `third_party/go-term/UPSTREAM` plus `third_party/go-term/patches`
+  (`git format-patch` output: `font.line_height`, and box drawing, block
+  elements and Powerline U+E0B0–E0BF drawn as cell geometry). Never edit the
+  copy; change a patch and run `scripts/update-goterm.sh [tag]`, which also
+  moves to a new tag. The nested `go.mod` keeps it out of `go test ./...`; test
+  it with `cd third_party/go-term && go test ./...`.
 
 ## Quality gate
 

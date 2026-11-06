@@ -1,0 +1,217 @@
+From 0719dd63bdd22875c5471a1b3e8eb1efac3cdd2f Mon Sep 17 00:00:00 2001
+From: Nilambar Sharma <nilambar@outlook.com>
+Date: Fri, 6 Nov 2026 22:17:18 +0545
+Subject: [PATCH 4/4] Draw Powerline separators U+E0B0-E0BF as cell geometry
+
+---
+ term/widget_draw_box.go      | 115 ++++++++++++++++++++++++++++++++---
+ term/widget_draw_box_test.go |  45 +++++++++++++-
+ 2 files changed, 151 insertions(+), 9 deletions(-)
+
+diff --git a/term/widget_draw_box.go b/term/widget_draw_box.go
+index 3b5ab50..b9b6e87 100644
+--- a/term/widget_draw_box.go
++++ b/term/widget_draw_box.go
+@@ -8,12 +8,13 @@ import (
+ 
+ // Built-in box drawing.
+ //
+-// Box Drawing (U+2500–257F) and Block Elements (U+2580–259F) are painted as
+-// geometry sized to the cell instead of as font glyphs. A font's glyph is only
+-// as tall as the font, so with Cfg.LineHeight above 1 — or with a font whose
+-// box glyphs stop short of the line height — vertical strokes and blocks leave
+-// a gap between rows. Geometry always reaches the cell edges, so adjacent
+-// cells join at any line height.
++// Box Drawing (U+2500–257F), Block Elements (U+2580–259F) and the Powerline
++// separators (U+E0B0–E0BF) are painted as geometry sized to the cell instead
++// of as font glyphs. A font's glyph is only as tall as the font, so with
++// Cfg.LineHeight above 1 — or with a font whose box glyphs stop short of the
++// line height — vertical strokes and blocks leave a gap between rows, and a
++// Powerline arrow ends short of the segment background it caps. Geometry
++// always reaches the cell edges, so adjacent cells join at any line height.
+ 
+ // Arm weights, one per direction out of the cell centre.
+ const (
+@@ -161,7 +162,9 @@ type boxPainter struct {
+ // reports whether it did. A false return means r is not built in and the
+ // caller draws the font glyph.
+ func (t *Term) drawBuiltinGlyph(dc *gui.DrawContext, x, y, w, h float32, r rune, color gui.Color) bool {
+-	if r < 0x2500 || r > 0x259F || w <= 0 || h <= 0 {
++	box := r >= 0x2500 && r <= 0x259F
++	powerline := r >= 0xE0B0 && r <= 0xE0BF
++	if !box && !powerline || w <= 0 || h <= 0 {
+ 		return false
+ 	}
+ 	dp := float32(1)
+@@ -175,7 +178,11 @@ func (t *Term) drawBuiltinGlyph(dc *gui.DrawContext, x, y, w, h float32, r rune,
+ 		lt: lt, ht: 2 * lt,
+ 		color: color,
+ 	}
+-	if r >= 0x2580 {
++	switch {
++	case powerline:
++		p.powerline(r)
++		return true
++	case r >= 0x2580:
+ 		return p.block(r)
+ 	}
+ 	return p.line(r)
+@@ -491,3 +498,95 @@ func (p *boxPainter) block(r rune) bool {
+ 	}
+ 	return true
+ }
++
++// powerline draws the U+E0B0–E0BF separators: solid and thin arrows, rounded
++// caps, and the slanted triangles and slashes. Solid shapes run edge to edge so
++// they meet the neighbouring segment's background without a seam.
++func (p *boxPainter) powerline(r rune) {
++	x0, y0, x1, y1 := p.x, p.y, p.x+p.w, p.y+p.h
++	switch r {
++	case 0xE0B0: // right-pointing solid arrow
++		p.poly(x0, y0, x1, p.cy, x0, y1)
++	case 0xE0B1: // right-pointing thin arrow
++		p.segment(x0, y0, x1, p.cy)
++		p.segment(x1, p.cy, x0, y1)
++	case 0xE0B2: // left-pointing solid arrow
++		p.poly(x1, y0, x1, y1, x0, p.cy)
++	case 0xE0B3: // left-pointing thin arrow
++		p.segment(x1, y0, x0, p.cy)
++		p.segment(x0, p.cy, x1, y1)
++	case 0xE0B4: // right half circle, solid
++		p.halfEllipse(x0, true, true)
++	case 0xE0B5: // right half circle, thin
++		p.halfEllipse(x0, true, false)
++	case 0xE0B6: // left half circle, solid
++		p.halfEllipse(x1, false, true)
++	case 0xE0B7: // left half circle, thin
++		p.halfEllipse(x1, false, false)
++	case 0xE0B8: // lower-left triangle
++		p.poly(x0, y0, x1, y1, x0, y1)
++	case 0xE0BA: // lower-right triangle
++		p.poly(x1, y0, x1, y1, x0, y1)
++	case 0xE0BC: // upper-left triangle
++		p.poly(x0, y0, x1, y0, x0, y1)
++	case 0xE0BE: // upper-right triangle
++		p.poly(x0, y0, x1, y0, x1, y1)
++	case 0xE0B9, 0xE0BF: // backslash separator
++		p.diagonal(false)
++	case 0xE0BB, 0xE0BD: // forward-slash separator
++		p.diagonal(true)
++	}
++}
++
++// poly fills a convex polygon given as flat x, y pairs.
++func (p *boxPainter) poly(pts ...float32) {
++	p.dc.FilledPolygon(pts, p.color)
++}
++
++// segment strokes a light line from (ax, ay) to (bx, by), offsetting the
++// quad along the line's normal so its thickness is lt at any angle.
++func (p *boxPainter) segment(ax, ay, bx, by float32) {
++	dx, dy := bx-ax, by-ay
++	l := float32(math.Hypot(float64(dx), float64(dy)))
++	if l == 0 {
++		return
++	}
++	nx, ny := -dy/l*p.lt/2, dx/l*p.lt/2
++	p.poly(ax+nx, ay+ny, bx+nx, by+ny, bx-nx, by-ny, ax-nx, ay-ny)
++}
++
++// halfEllipse draws a half ellipse whose flat side lies on the vertical line
++// x = edge, bulging right (toward +x) or left across the full cell, solid or
++// as a light outline.
++func (p *boxPainter) halfEllipse(edge float32, right, solid bool) {
++	const segs = 24
++	sx := float32(1)
++	if !right {
++		sx = -1
++	}
++	rx, ry := p.w, p.h/2
++	pt := func(rx, ry float32, k int) (float32, float32) {
++		// k = 0 is the top of the flat side, k = segs the bottom.
++		a := math.Pi * float64(k) / segs
++		return edge + sx*rx*float32(math.Sin(a)), p.cy - ry*float32(math.Cos(a))
++	}
++	if solid {
++		pts := make([]float32, 0, 2*(segs+1))
++		for k := 0; k <= segs; k++ {
++			x, y := pt(rx, ry, k)
++			pts = append(pts, x, y)
++		}
++		p.poly(pts...)
++		return
++	}
++	// Outline: the inner edge is pulled in by lt so the stroke stays inside
++	// the cell.
++	irx, iry := rx-p.lt, ry-p.lt/2
++	for k := range segs {
++		ox0, oy0 := pt(rx, ry, k)
++		ox1, oy1 := pt(rx, ry, k+1)
++		ix1, iy1 := pt(irx, iry, k+1)
++		ix0, iy0 := pt(irx, iry, k)
++		p.poly(ox0, oy0, ox1, oy1, ix1, iy1, ix0, iy0)
++	}
++}
+diff --git a/term/widget_draw_box_test.go b/term/widget_draw_box_test.go
+index 76dd4a2..2cf1b57 100644
+--- a/term/widget_draw_box_test.go
++++ b/term/widget_draw_box_test.go
+@@ -130,7 +130,7 @@ func TestBuiltinBlocks(t *testing.T) {
+ }
+ 
+ func TestBuiltinGlyphSkipsOthers(t *testing.T) {
+-	for _, r := range []rune{'A', '■', 0x25FF, 0x24FF} {
++	for _, r := range []rune{'A', '■', 0x25FF, 0x24FF, 0xE0AF, 0xE0C0} {
+ 		if _, ok := drawBox(t, r); ok {
+ 			t.Errorf("%U drawn as built-in", r)
+ 		}
+@@ -150,3 +150,46 @@ func TestOnDraw_BoxCharIsGeometry(t *testing.T) {
+ 		}
+ 	}
+ }
++
++// Solid Powerline caps fill their flat side edge to edge, so they meet the
++// segment background at any row height, and leave the far corners empty.
++func TestBuiltinPowerline(t *testing.T) {
++	const top, bot, mid = 0.25, boxH - 0.25, boxH / 2
++	const l, r = 0.25, boxW - 0.25
++	cases := []struct {
++		r    rune
++		in   [][2]float32
++		out  [][2]float32
++		name string
++	}{
++		{0xE0B0, [][2]float32{{l, 1}, {l, boxH - 1}, {r, mid}}, [][2]float32{{r, top}, {r, bot}}, "right arrow"},
++		{0xE0B2, [][2]float32{{r, 1}, {r, boxH - 1}, {l, mid}}, [][2]float32{{l, top}, {l, bot}}, "left arrow"},
++		{0xE0B4, [][2]float32{{l, top}, {l, bot}, {r, mid}}, [][2]float32{{r, top}, {r, bot}}, "right half circle"},
++		{0xE0B6, [][2]float32{{r, top}, {r, bot}, {l, mid}}, [][2]float32{{l, top}, {l, bot}}, "left half circle"},
++		{0xE0B8, [][2]float32{{l, bot}, {l, mid}}, [][2]float32{{r, top}}, "lower-left triangle"},
++		{0xE0BE, [][2]float32{{r, top}, {r, mid}}, [][2]float32{{l, bot}}, "upper-right triangle"},
++		{0xE0B1, [][2]float32{{boxW / 2, boxH / 4}}, [][2]float32{{l, mid}, {r, top}}, "thin right arrow"},
++	}
++	for _, c := range cases {
++		dc, ok := drawBox(t, c.r)
++		if !ok {
++			t.Errorf("%s: not built in", c.name)
++			continue
++		}
++		for _, pt := range c.in {
++			if !covered(dc, pt[0], pt[1]) {
++				t.Errorf("%s: (%v, %v) empty, want filled", c.name, pt[0], pt[1])
++			}
++		}
++		for _, pt := range c.out {
++			if covered(dc, pt[0], pt[1]) {
++				t.Errorf("%s: (%v, %v) filled, want empty", c.name, pt[0], pt[1])
++			}
++		}
++	}
++	for r := rune(0xE0B0); r <= 0xE0BF; r++ {
++		if dc, ok := drawBox(t, r); !ok || len(dc.Batches()) == 0 {
++			t.Errorf("%U: drawn = %v, batches = %d", r, ok, len(dc.Batches()))
++		}
++	}
++}
+-- 
+2.54.0 (Apple Git-157)
+

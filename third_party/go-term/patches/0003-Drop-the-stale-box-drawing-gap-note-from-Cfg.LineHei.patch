@@ -1,0 +1,28 @@
+From d2e1227d673227b0566bc43a6e4abd786ed60919 Mon Sep 17 00:00:00 2001
+From: Nilambar Sharma <nilambar@outlook.com>
+Date: Fri, 6 Nov 2026 22:13:29 +0545
+Subject: [PATCH 3/4] Drop the stale box-drawing gap note from Cfg.LineHeight
+
+---
+ term/widget_cfg.go | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/term/widget_cfg.go b/term/widget_cfg.go
+index 1436aea..f044cbc 100644
+--- a/term/widget_cfg.go
++++ b/term/widget_cfg.go
+@@ -205,9 +205,8 @@ type Cfg struct {
+ 
+ 	// LineHeight scales the row height relative to the font's own line
+ 	// height. Zero (default) or anything outside [1, MaxLineHeight] means
+-	// 1.0. Glyphs are centred vertically in the taller row. Box-drawing
+-	// characters are font glyphs, so values above 1 leave gaps between
+-	// vertically adjacent ones.
++	// 1.0. Glyphs are centred vertically in the taller row; box-drawing and
++	// block characters are drawn as geometry, so they still join across rows.
+ 	LineHeight float32
+ 
+ 	// NotifyAfter fires a desktop notification when a command that ran at
+-- 
+2.54.0 (Apple Git-157)
+

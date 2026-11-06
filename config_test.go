@@ -144,6 +144,26 @@ func TestReadConfigWindowPadding(t *testing.T) {
 	}
 }
 
+func TestReadConfigLineHeight(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[font]\nline_height = 1.2\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if cfg.Font.LineHeight != 1.2 {
+		t.Errorf("Font.LineHeight = %v, want 1.2", cfg.Font.LineHeight)
+	}
+
+	for _, bad := range []string{"0.8", "3"} {
+		cfg, warnings = readConfig(writeConfig(t, "[font]\nline_height = "+bad+"\n"))
+		if len(warnings) != 1 || !strings.Contains(warnings[0], "font.line_height") {
+			t.Fatalf("line_height %s: warnings = %q, want one naming font.line_height", bad, warnings)
+		}
+		if cfg.Font.LineHeight != defaultLineHeight {
+			t.Errorf("line_height %s: Font.LineHeight = %v, want the default", bad, cfg.Font.LineHeight)
+		}
+	}
+}
+
 func TestReadConfigClampsMinimumToOpeningSize(t *testing.T) {
 	cfg, warnings := readConfig(writeConfig(t, "[window]\nwidth = 300\n"))
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "min_width") {

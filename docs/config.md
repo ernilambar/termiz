@@ -37,8 +37,9 @@ min_height      = 240
 padding         = 8       # 0–64; inset from the window edge to the terminal
 
 [font]
-family = "Menlo"
-size   = 12          # 6–72
+family      = "Menlo"
+size        = 12     # 6–72
+line_height = 1.0    # 1.0–2.0; row height as a multiple of the font's
 
 [theme]
 name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
@@ -95,6 +96,7 @@ A `min_width`/`min_height` larger than the opening size is lowered to
 | --- | --- | --- | --- |
 | `family` | string | `"Menlo"` | Font family name. An empty value quietly falls back to the default. |
 | `size` | number | `12` | Point size, from 6 through 72 inclusive. |
+| `line_height` | number | `1.0` | Row height as a multiple of the font's own, from 1.0 through 2.0. Glyphs are centred in the taller row; box-drawing and block characters still join across rows. Out of range is logged and replaced by 1.0. |
 
 The size range is a usability bound: below 6 points text is unreadable, above
 72 a single cell no longer fits the 24×80 grid the PTY starts with. A value
