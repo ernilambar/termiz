@@ -13,9 +13,13 @@ When `XDG_CONFIG_HOME` is unset, or is not an absolute path, the file is
 purpose: a GUI launch resolves it against the working directory, which is `/`
 for a Finder launch.
 
-The file is read once, before the window opens; a change applies on the next
-launch. termiz never changes its contents — editing it is the only way to
-change settings.
+The file is read before the window opens. `Termiz > Reload Configuration`
+(⌘⇧,) re-reads it into the running window: theme, font, scrollback, cursor,
+keybindings, window padding and `confirm_on_quit` apply immediately. Window
+geometry, `terminal.shell`, `terminal.dir`, `allow_osc52` and `download_dir`
+are fixed when the shell starts, so a change to them is logged and applies on
+the next launch. termiz never changes its contents — editing it is the only
+way to change settings.
 
 ## Example
 
@@ -24,12 +28,13 @@ change settings.
 config_file = "~/dotfiles/termiz/config.toml"
 
 [window]
-maximize   = true   # macOS: fill the visible screen area on launch
-width      = 1000
-height     = 640
-min_width  = 400
-min_height = 240
-padding    = 8       # 0–64; inset from the window edge to the terminal
+maximize        = true   # macOS: fill the visible screen area on launch
+confirm_on_quit = false  # ask before closing a running shell
+width           = 1000
+height          = 640
+min_width       = 400
+min_height      = 240
+padding         = 8       # 0–64; inset from the window edge to the terminal
 
 [font]
 family = "Menlo"
@@ -69,6 +74,7 @@ scroll-page-up = "none"  # hand PageUp back to the child
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `maximize` | bool | `true` | Open filling the screen's visible area, like Window > Zoom. Set `false` to open at `width`×`height`. |
+| `confirm_on_quit` | bool | `false` | Ask before closing the window or quitting while the shell is still running. A shell that exits on its own closes the window without a prompt. |
 | `width` | int | `1000` | Initial window width in points; must be positive. |
 | `height` | int | `640` | Initial window height in points; must be positive. |
 | `min_width` | int | `400` | Minimum width the user can resize to; must be positive. |
@@ -275,6 +281,14 @@ While the session runs the directory is sampled every 2 seconds and written
 only when it changes; it is written once more at close, so a shell that exits
 on its own still leaves the last directory. Naming `terminal.dir` pins the
 start directory and stops the state write entirely.
+
+`Termiz > Reload Configuration` (⌘⇧,) re-runs the loader and pushes the
+result into the open window. The config-file chain is followed again, so a
+change to an included file is picked up too. Warnings are written to the log
+under the same `config:` prefix; a changed setting without a live setter is
+named in a `restart to apply` line. A file in the chain that cannot be
+parsed aborts the reload, so the window keeps its current settings until the
+file is fixed.
 
 `Termiz > Settings…` (⌘,) opens the config in `$VISUAL`, then `$EDITOR`, then
 the system text editor. The editor command is looked up in the `PATH` the

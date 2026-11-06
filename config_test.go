@@ -51,12 +51,15 @@ func TestReadConfigAppliesFileOverDefaults(t *testing.T) {
 }
 
 func TestReadConfigKeepsExplicitZeroValues(t *testing.T) {
-	cfg, warnings := readConfig(writeConfig(t, "[window]\nmaximize = false\n\n[terminal]\ncursor_blink = false\nscrollback_rows = 0\n"))
+	cfg, warnings := readConfig(writeConfig(t, "[window]\nmaximize = false\nconfirm_on_quit = false\n\n[terminal]\ncursor_blink = false\nscrollback_rows = 0\n"))
 	if len(warnings) != 0 {
 		t.Fatalf("warnings = %q, want none", warnings)
 	}
 	if cfg.Window.Maximize {
 		t.Error("Window.Maximize = true, want explicit false")
+	}
+	if cfg.Window.ConfirmOnQuit {
+		t.Error("Window.ConfirmOnQuit = true, want explicit false")
 	}
 	if cfg.Terminal.CursorBlink {
 		t.Error("Terminal.CursorBlink = true, want explicit false")
@@ -166,8 +169,10 @@ func TestReadConfigIgnoresUnparseableFile(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %q, want the parse error", warnings)
 	}
-	if want := defaultConfig(); !reflect.DeepEqual(cfg, want) {
-		t.Fatalf("cfg = %+v, want defaults %+v", cfg, want)
+	want := defaultConfig()
+	want.unreadable = true
+	if !reflect.DeepEqual(cfg, want) {
+		t.Fatalf("cfg = %+v, want unreadable defaults %+v", cfg, want)
 	}
 }
 
@@ -379,8 +384,10 @@ func TestReadConfigSyntaxErrorIgnoresFile(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %q, want one parse error", warnings)
 	}
-	if !reflect.DeepEqual(cfg, defaultConfig()) {
-		t.Errorf("cfg = %+v, want defaults", cfg)
+	want := defaultConfig()
+	want.unreadable = true
+	if !reflect.DeepEqual(cfg, want) {
+		t.Errorf("cfg = %+v, want unreadable defaults", cfg)
 	}
 }
 
@@ -531,5 +538,30 @@ func TestReadConfigKeybindingsMergeAcrossInclude(t *testing.T) {
 	want := map[string]string{"term.copy": "Cmd+J", "term.find": "Cmd+G"}
 	if !reflect.DeepEqual(cfg.Keybindings, want) {
 		t.Errorf("Keybindings = %v, want %v", cfg.Keybindings, want)
+	}
+}
+
+// A reload must be able to tell a parse failure from a file that sets
+// nothing, or a half-saved edit resets the running window to defaults. The
+// direct syntax-error case is covered by TestReadConfigIgnoresUnparseableFile.
+func TestReadConfigMarksUnreadable(t *testing.T) {
+	if cfg, _ := readConfig(writeConfig(t, "[window]\nwidth = 1200\n")); cfg.unreadable {
+		t.Error("valid file: unreadable = true, want false")
+	}
+	if cfg, _ := readConfig(filepath.Join(t.TempDir(), "missing.toml")); cfg.unreadable {
+		t.Error("missing file: unreadable = true, want false")
+	}
+
+	dir := t.TempDir()
+	writeConfigAt(t, filepath.Join(dir, "base.toml"), "[font\n")
+	writeConfigAt(t, filepath.Join(dir, "config.toml"), "config_file = \"base.toml\"\n")
+	if cfg, _ := readConfig(filepath.Join(dir, "config.toml")); !cfg.unreadable {
+		t.Error("broken include: unreadable = false, want true")
+	}
+}
+
+func TestConfirmOnQuitDefaultsOff(t *testing.T) {
+	if defaultConfig().Window.ConfirmOnQuit {
+		t.Error("ConfirmOnQuit defaults to true, want false")
 	}
 }

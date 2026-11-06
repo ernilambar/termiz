@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-gui-org/go-gui/gui"
 )
 
 // stubEditor writes an executable shell script that records its argv, one
@@ -212,6 +214,35 @@ func TestOpenConfigInEditorUnresolvedEditorFallsBack(t *testing.T) {
 	got := waitForEditorArgs(t, capture)
 	if len(got) != 2 || got[0] != "-t" {
 		t.Fatalf("open argv = %q, want [-t <config path>]", got)
+	}
+}
+
+// TestMenubarCfg pins the two app-menu items and their chords. The items are
+// moved into the app menu by native code, so their IDs are the contract
+// installMenubar relies on.
+func TestMenubarCfg(t *testing.T) {
+	mb := menubarCfg("Termiz", func() {}, func() {})
+	if mb.AppName != "Termiz" || !mb.IncludeWindowMenu {
+		t.Errorf("menubar = %+v, want AppName Termiz with the window menu", mb)
+	}
+	if len(mb.Menus) != 1 || mb.Menus[0].Title != settingsMenuTitle {
+		t.Fatalf("menus = %+v, want one %q menu", mb.Menus, settingsMenuTitle)
+	}
+
+	items := mb.Menus[0].Items
+	if len(items) != 2 {
+		t.Fatalf("items = %+v, want Settings and Reload", items)
+	}
+	if items[0].ID != settingsActionID || items[0].Shortcut != (gui.Shortcut{Key: gui.KeyComma, Modifiers: gui.ModSuper}) {
+		t.Errorf("settings item = %+v, want Cmd+,", items[0])
+	}
+	if items[1].ID != reloadActionID || items[1].Text != reloadLabel || items[1].Shortcut != reloadShortcut {
+		t.Errorf("reload item = %+v, want %s with Cmd+Shift+,", items[1], reloadLabel)
+	}
+
+	// A nil callback (no window yet) must not produce a dead menu item.
+	if got := menubarCfg("Termiz", nil, nil).Menus[0].Items; len(got) != 1 {
+		t.Errorf("items without reload = %+v, want Settings only", got)
 	}
 }
 

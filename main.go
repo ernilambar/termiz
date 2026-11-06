@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/go-gui-org/go-gui/gui"
 	"github.com/go-gui-org/go-gui/gui/appinfo"
@@ -115,6 +116,70 @@ func launch() {
 
 	var tm *term.Term
 	var stopDirWatch func()
+	var reloadMu sync.Mutex
+
+	// applyReload adopts next in the running window. The terminal setters run
+	// on the main thread; settings without a live setter are reported so the
+	// user knows a restart is needed.
+	applyReload := func(win *gui.Window, next config) {
+		old := cfg
+		named, ok := lookupTheme(next.Theme.Name)
+		if !ok {
+			named, _ = lookupTheme("")
+		}
+		applyTermConfig(tm, next, named)
+		gui.SetTheme(chromeTheme(named.Theme))
+		if next.Window.Padding != old.Window.Padding {
+			win.SetView(paddedView(tm, next.Window.Padding))
+		}
+		// A newly pinned (or released) terminal.dir changes whether the
+		// session directory is sampled at all, so restart the sampler.
+		if old.Terminal.Dir != next.Terminal.Dir {
+			if stopDirWatch != nil {
+				stopDirWatch()
+			}
+			stopDirWatch = watchDir(tm, next)
+		}
+		cfg = next
+
+		live, restart := configChanges(old, next)
+		if len(live) > 0 {
+			log.Printf("config: reloaded %s", strings.Join(live, ", "))
+		}
+		if len(restart) > 0 {
+			log.Printf("config: %s changed; restart to apply", strings.Join(restart, ", "))
+		}
+		if len(live) == 0 && len(restart) == 0 {
+			log.Printf("config: reloaded; no changes")
+		}
+	}
+
+	// reload re-reads the config file. The read runs off the main thread
+	// because resolving terminal.shell can run the login shell's PATH probe;
+	// applying the result is queued back onto the main thread.
+	reload := func(win *gui.Window) {
+		go func() {
+			reloadMu.Lock()
+			defer reloadMu.Unlock()
+			next := loadConfig()
+			if next.unreadable {
+				// A half-saved edit with a syntax error would otherwise
+				// reset the live window to the built-in defaults.
+				log.Printf("config: not reloaded; keeping current settings")
+				return
+			}
+			if win.CloseRequested() {
+				return
+			}
+			win.QueueCommand(func(win *gui.Window) {
+				if tm == nil || win.CloseRequested() {
+					return
+				}
+				applyReload(win, next)
+			})
+		}()
+	}
+
 	w := gui.NewWindow(gui.WindowCfg{
 		// Title comes from the manifest's name when left empty.
 		AppInfo:   info,
@@ -123,23 +188,41 @@ func launch() {
 		Height:    cfg.Window.Height,
 		MinWidth:  cfg.Window.MinWidth,
 		MinHeight: cfg.Window.MinHeight,
-		OnInit: func(w *gui.Window) {
+		OnCloseRequest: func(win *gui.Window) {
+			// A dialog is already up (repeated Cmd+Q or a close-button
+			// click while confirming). go-gui suppresses the hook while a
+			// dialog is visible, but keep the guard local too.
+			if win.DialogIsVisible() {
+				return
+			}
+			if !shouldConfirmQuit(cfg, tm != nil && tm.Alive()) {
+				win.Close()
+				return
+			}
+			// The in-app dialog, not a native NSAlert: go-gui renders and
+			// keyboard-routes it itself, and the native modal loses focus
+			// under the Metal backend's manual event pump.
+			win.Dialog(quitDialog(info.Name))
+		},
+		OnInit: func(win *gui.Window) {
 			if cfg.Window.Maximize {
 				maximizeWindow()
 			}
-			installMenubar(w.App())
 
 			var err error
 			tc := termConfig(cfg, named, command, env, dir)
-			tc.OnExit = w.Close
-			tm, err = term.New(w, tc)
+			tc.OnExit = win.Close
+			tm, err = term.New(win, tc)
 			if err != nil {
 				log.Printf("term.New: %v", err)
-				w.Close()
+				win.Close()
 				return
 			}
-			w.SetView(paddedView(tm, cfg.Window.Padding))
+			win.SetView(paddedView(tm, cfg.Window.Padding))
 			stopDirWatch = watchDir(tm, cfg)
+			// Installed after term.New so the reload callback can never see
+			// a nil Term.
+			installMenubar(win.App(), func() { reload(win) })
 		},
 	})
 	defer func() {
@@ -156,6 +239,27 @@ func launch() {
 
 	gui.SetTheme(chromeTheme(theme))
 	backend.RunApp(app, w)
+}
+
+// shouldConfirmQuit reports whether a close request needs the confirmation
+// dialog: the setting is on and the shell is still alive. A shell that has
+// already exited is closing on its own, so the window just closes.
+func shouldConfirmQuit(cfg config, alive bool) bool {
+	return cfg.Window.ConfirmOnQuit && alive
+}
+
+// quitDialog builds the "a shell is still running" confirmation. Enter quits:
+// reaching this dialog already took a deliberate quit gesture (Cmd+Q or the
+// close button), so Yes is the answer the user came to give; Esc and No still
+// cancel.
+func quitDialog(name string) gui.DialogCfg {
+	return gui.DialogCfg{
+		DialogType:    gui.DialogConfirm,
+		Title:         "Quit " + name + "?",
+		Body:          "A terminal is still running. Quit and end it?",
+		DefaultButton: gui.DialogButtonYes,
+		OnOkYes:       func(w *gui.Window) { w.Close() },
+	}
 }
 
 // cursorStyle maps a normalized terminal.cursor_style value to go-term's

@@ -23,12 +23,13 @@ import (
 //	config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
 //
 //	[window]
-//	maximize   = true   # fill the screen's visible area on launch
-//	width      = 1000
-//	height     = 640
-//	min_width  = 400
-//	min_height = 240
-//	padding    = 8      # inset between the window edge and the terminal
+//	maximize        = true   # fill the screen's visible area on launch
+//	confirm_on_quit = false  # ask before closing a running shell
+//	width           = 1000
+//	height          = 640
+//	min_width       = 400
+//	min_height      = 240
+//	padding         = 8      # inset between the window edge and the terminal
 //
 //	[font]
 //	family = "Menlo"
@@ -55,8 +56,10 @@ import (
 // Reading is deliberately forgiving: a file with a syntax error is ignored
 // whole, while a bad value, a value of the wrong type or an unknown key is
 // logged and only that key falls back to its default, because a typo in a
-// settings file must not keep the window from opening. The file is read once
-// at startup, so a change applies on the next launch.
+// settings file must not keep the window from opening. The file is read at
+// startup and again by Termiz > Reload Configuration (Cmd+Shift+,); a reload
+// applies the settings that have live setters and reports the rest as needing
+// a restart.
 type config struct {
 	// ConfigFile names another file to load as the base for this one, so the
 	// real settings can live wherever the user keeps them — a dotfiles
@@ -76,17 +79,27 @@ type config struct {
 	// the key reaches the child. Names are bare ("copy") or namespaced
 	// ("term.copy"); the map is validated in normalize.
 	Keybindings map[string]string `toml:"keybindings"`
+
+	// unreadable is set when a file in the chain could not be read or
+	// parsed, so the result is defaults rather than what the user wrote.
+	// Startup accepts that; a reload keeps the running settings instead.
+	unreadable bool
 }
 
 type windowConfig struct {
 	// Maximize opens the window filling the screen's visible area, the same
 	// operation as the Window > Zoom menu item. Set false to open at
 	// Width×Height instead.
-	Maximize  bool `toml:"maximize"`
-	Width     int  `toml:"width"`
-	Height    int  `toml:"height"`
-	MinWidth  int  `toml:"min_width"`
-	MinHeight int  `toml:"min_height"`
+	Maximize bool `toml:"maximize"`
+	// ConfirmOnQuit asks for confirmation when the window is closed or the app
+	// quits while the shell is still running, so Cmd+Q cannot silently kill a
+	// running job. Off by default. The shell exiting on its own closes the
+	// window without a prompt.
+	ConfirmOnQuit bool `toml:"confirm_on_quit"`
+	Width         int  `toml:"width"`
+	Height        int  `toml:"height"`
+	MinWidth      int  `toml:"min_width"`
+	MinHeight     int  `toml:"min_height"`
 	// Padding is the inset, in points, between the window edge and the
 	// terminal widget, so text does not sit flush against the chrome. The
 	// widget keeps a 4 px inset of its own inside that, so the first column
@@ -166,12 +179,13 @@ const (
 func defaultConfig() config {
 	return config{
 		Window: windowConfig{
-			Maximize:  true,
-			Width:     defaultWidth,
-			Height:    defaultHeight,
-			MinWidth:  defaultMinWidth,
-			MinHeight: defaultMinHeight,
-			Padding:   defaultPadding,
+			Maximize:      true,
+			ConfirmOnQuit: false,
+			Width:         defaultWidth,
+			Height:        defaultHeight,
+			MinWidth:      defaultMinWidth,
+			MinHeight:     defaultMinHeight,
+			Padding:       defaultPadding,
 		},
 		Font: fontConfig{
 			Family: defaultFontFamily,
@@ -251,6 +265,7 @@ func readConfigFile(path string, base config, depth int, seen map[string]bool) (
 		if errors.Is(err, fs.ErrNotExist) && depth == 0 {
 			return base, nil
 		}
+		base.unreadable = true
 		return base, []string{fmt.Sprintf("%s: %v", path, err)}
 	}
 

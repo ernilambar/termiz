@@ -27,8 +27,18 @@ const configHeader = "# termiz configuration: every key is optional.\n" +
 // user's editor.
 const settingsActionID = "settings.open-config"
 
-// settingsMenuTitle is the throwaway top-level menu that carries the settings
-// item into place. go-gui's app menu is About / separator / Quit with no slot
+// reloadActionID is the native menu item that re-reads the config file into
+// the running window.
+const reloadActionID = "settings.reload-config"
+
+// reloadLabel is the menu text. Cmd+Shift+, is the conventional reload chord;
+// the native encoder carries punctuation, so it is shown beside the item.
+const reloadLabel = "Reload Configuration"
+
+var reloadShortcut = gui.Shortcut{Key: gui.KeyComma, Modifiers: gui.ModSuper | gui.ModShift}
+
+// settingsMenuTitle is the throwaway top-level menu that carries the Settings
+// and Reload items into place. go-gui's app menu is About / separator / Quit with no slot
 // for app-defined items, so the item is declared like any other menu and then
 // moved into the app menu ("Termiz") by moveMenuItemsIntoAppMenu, which
 // deletes this top-level menu. IncludeWindowMenu restores Cmd+W and Cmd+M,
@@ -36,37 +46,63 @@ const settingsActionID = "settings.open-config"
 const settingsMenuTitle = "Settings"
 
 // installMenubar replaces go-gui's default menubar with the app's own. The
-// settings item ends up in the Termiz app menu, the macOS place for
-// preferences, via native AppKit surgery because go-gui exposes no app-menu
-// items.
-func installMenubar(app *gui.App) {
-	app.SetNativeMenubar(gui.NativeMenubarCfg{
-		AppName:           info.Name,
-		IncludeWindowMenu: true,
-		Menus: []gui.NativeMenuCfg{{
-			Title: settingsMenuTitle,
-			Items: []gui.NativeMenuItemCfg{{
-				ID:       settingsActionID,
-				Text:     "Settings…",
-				Shortcut: gui.Shortcut{Key: gui.KeyComma, Modifiers: gui.ModSuper},
-			}},
-		}},
-		OnAction: func(id string) {
-			if id != settingsActionID {
-				return
-			}
-			// Off the main thread: the first call asks the login shell for
-			// its PATH, which can take seconds with a heavy profile.
-			go func() {
-				if err := openConfigInEditor(); err != nil {
-					log.Printf("settings: %v", err)
-				}
-			}()
-		},
-	})
+// Settings and Reload items end up in the Termiz app menu, the macOS place
+// for such commands, via native AppKit surgery because go-gui exposes no
+// app-menu items.
+func installMenubar(app *gui.App, reload func()) {
+	app.SetNativeMenubar(menubarCfg(info.Name, openConfigAsync, reload))
 	// SetNativeMenubar installs synchronously on the calling (main) thread,
 	// so the app menu exists by now.
 	moveMenuItemsIntoAppMenu(settingsMenuTitle)
+}
+
+// menubarCfg builds the menubar configuration, split out of installMenubar so
+// a test can assert the items and their chords: SetNativeMenubar needs a
+// registered window and a live platform backend.
+func menubarCfg(appName string, settings, reload func()) gui.NativeMenubarCfg {
+	items := []gui.NativeMenuItemCfg{{
+		ID:       settingsActionID,
+		Text:     "Settings…",
+		Shortcut: gui.Shortcut{Key: gui.KeyComma, Modifiers: gui.ModSuper},
+	}}
+	if reload != nil {
+		items = append(items, gui.NativeMenuItemCfg{
+			ID:       reloadActionID,
+			Text:     reloadLabel,
+			Shortcut: reloadShortcut,
+		})
+	}
+	return gui.NativeMenubarCfg{
+		AppName:           appName,
+		IncludeWindowMenu: true,
+		Menus: []gui.NativeMenuCfg{{
+			Title: settingsMenuTitle,
+			Items: items,
+		}},
+		OnAction: func(id string) {
+			switch id {
+			case settingsActionID:
+				if settings != nil {
+					settings()
+				}
+			case reloadActionID:
+				if reload != nil {
+					reload()
+				}
+			}
+		},
+	}
+}
+
+// openConfigAsync runs the editor launch off the main thread: the first call
+// asks the login shell for its PATH, which can take seconds with a heavy
+// profile.
+func openConfigAsync() {
+	go func() {
+		if err := openConfigInEditor(); err != nil {
+			log.Printf("settings: %v", err)
+		}
+	}()
 }
 
 // openConfigInEditor opens the primary config file in $VISUAL, then $EDITOR,

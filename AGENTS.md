@@ -87,6 +87,14 @@ go build ./...
   the config directory and seeds a missing file with `configHeader`, a comment
   that links `docs/config.md` and sets no value (the system editor also needs
   the path to exist); an existing file is never touched.
+- `Termiz > Reload Configuration` (Cmd+Shift+,) re-runs `loadConfig` off the
+  main thread and applies the result through `applyTermConfig` (`reload.go`),
+  which uses go-term's live setters. `configChanges` names the keys a running
+  window cannot adopt, so they are logged as needing a restart. Closing the
+  window or quitting while the shell is alive shows `quitDialog` via
+  `WindowCfg.OnCloseRequest` when `window.confirm_on_quit` is true (off by
+  default); a shell
+  exiting on its own calls `Window.Close` directly and never prompts.
 - Window maximization lives behind `maximizeWindow` (`window_darwin.go`, cgo):
   go-gui exposes no maximize or fullscreen call, so it zooms the AppKit key
   window in `OnInit`.

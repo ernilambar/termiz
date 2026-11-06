@@ -62,8 +62,11 @@ and the bundled app reports to its children.
 ## Configuration
 
 The app reads one optional file: `$XDG_CONFIG_HOME/termiz/config.toml`, or
-`~/.config/termiz/config.toml` when `XDG_CONFIG_HOME` is unset. It is read once
-at startup, so a change applies on the next launch. Everything is optional; a
+`~/.config/termiz/config.toml` when `XDG_CONFIG_HOME` is unset. It is read at
+startup; `Termiz > Reload Configuration` (⌘⇧,) re-reads it without restarting
+the shell, applying the theme, font, scrollback, cursor, keybindings, padding
+and quit-confirmation settings. Window geometry, `terminal.shell`, `terminal.dir`,
+`allow_osc52` and `download_dir` need a restart, which the log reports. Everything is optional; a
 missing file means the defaults below. Unknown keys and out-of-range values are
 logged and replaced by the default, so a typo never keeps the window from
 opening. The log is `~/Library/Logs/termiz.log` (also in Console.app); check it
@@ -74,12 +77,13 @@ when a setting seems ignored or the window closes on launch. The app writes one 
 config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
 
 [window]
-maximize   = true   # fill the screen's visible area on launch
-width      = 1000
-height     = 640
-min_width  = 400
-min_height = 240
-padding    = 8       # 0–64; inset from the window edge to the terminal
+maximize        = true   # fill the screen's visible area on launch
+confirm_on_quit = false  # ask before closing a running shell
+width           = 1000
+height          = 640
+min_width       = 400
+min_height      = 240
+padding         = 8       # 0–64; inset from the window edge to the terminal
 
 [font]
 family = "Menlo"
@@ -115,6 +119,11 @@ cursor either way. An unknown style is logged and replaced by `block`.
 `window.maximize`, on by default, opens the window filling the screen's
 visible area — the same as the Window > Zoom menu item. Set it to `false` to
 open at `width`×`height` instead.
+
+`window.confirm_on_quit`, off by default, asks for confirmation when the window
+is closed or the app quits while the shell is still running, so ⌘Q cannot
+silently kill a job. The shell exiting on its own closes the window without a
+prompt. Set it to `true` to turn the prompt on.
 
 `window.padding` is the inset, in points, between the window edge and the
 terminal, and defaults to `8`. The terminal keeps a 4 px inset of its own
