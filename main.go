@@ -44,7 +44,7 @@ var iconPNG []byte
 // version is the app version: the bundle version cmd/buildapp writes, and the
 // version reported to children as TERM_PROGRAM_VERSION. The release tag must
 // match it, so bump this when cutting a release.
-const version = "0.1.1"
+const version = "0.1.2"
 
 // main dispatches the command line. A bundled launch passes no arguments, so
 // anything unrecognized is a user mistake and is reported rather than opening
