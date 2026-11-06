@@ -13,6 +13,7 @@ import (
 // applyTermConfig testable without a window or a PTY.
 type liveSettings interface {
 	SetTextStyle(gui.TextStyle)
+	SetLineHeight(float32)
 	SetTheme(term.Theme)
 	SetScrollbackRows(int)
 	SetCursorStyle(term.CursorStyle)
@@ -25,6 +26,7 @@ type liveSettings interface {
 // mirrors termConfig, the construction-time path; keep the two in step.
 func applyTermConfig(tm liveSettings, cfg config, named term.NamedTheme) {
 	tm.SetTextStyle(gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)})
+	tm.SetLineHeight(float32(cfg.Font.LineHeight))
 	tm.SetTheme(named.Theme)
 	tm.SetScrollbackRows(cfg.Terminal.ScrollbackRows)
 	tm.SetCursorStyle(cursorStyle(cfg.Terminal.CursorStyle))

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/go-gui-org/go-term/term"
 )
 
 // The config file is optional. When it is missing, every field keeps the
@@ -32,8 +33,9 @@ import (
 //	padding         = 8      # inset between the window edge and the terminal
 //
 //	[font]
-//	family = "Menlo"
-//	size   = 12
+//	family      = "Menlo"
+//	size        = 12
+//	line_height = 1.0    # row height as a multiple of the font's; 1.0-2.0
 //
 //	[theme]
 //	name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
@@ -110,6 +112,10 @@ type windowConfig struct {
 type fontConfig struct {
 	Family string  `toml:"family"`
 	Size   float64 `toml:"size"`
+	// LineHeight scales the row height; glyphs stay centred in the taller
+	// row. Box-drawing characters are font glyphs in go-term, so above 1.0
+	// they show gaps between rows.
+	LineHeight float64 `toml:"line_height"`
 }
 
 type themeConfig struct {
@@ -174,6 +180,9 @@ const (
 	// longer fits the 24x80 grid the PTY starts with.
 	minFontSize = 6
 	maxFontSize = 72
+	// go-term honours [1, term.MaxLineHeight]; anything else draws at 1.
+	defaultLineHeight = 1.0
+	maxLineHeight     = term.MaxLineHeight
 )
 
 func defaultConfig() config {
@@ -188,8 +197,9 @@ func defaultConfig() config {
 			Padding:       defaultPadding,
 		},
 		Font: fontConfig{
-			Family: defaultFontFamily,
-			Size:   defaultFontSize,
+			Family:     defaultFontFamily,
+			Size:       defaultFontSize,
+			LineHeight: defaultLineHeight,
 		},
 		Terminal: terminalConfig{
 			ScrollbackRows: defaultScrollback,
@@ -450,6 +460,10 @@ func normalize(c *config) []string {
 	if c.Font.Size < minFontSize || c.Font.Size > maxFontSize {
 		warn("font.size must be between %d and %d; using %d", minFontSize, maxFontSize, defaultFontSize)
 		c.Font.Size = defaultFontSize
+	}
+	if c.Font.LineHeight < 1 || c.Font.LineHeight > maxLineHeight {
+		warn("font.line_height must be between 1 and %d; using %g", maxLineHeight, defaultLineHeight)
+		c.Font.LineHeight = defaultLineHeight
 	}
 
 	if name, ok := cursorStyleName(c.Terminal.CursorStyle); !ok {

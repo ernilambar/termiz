@@ -11,6 +11,7 @@ import (
 // liveRecorder records the setter calls applyTermConfig makes.
 type liveRecorder struct {
 	style      gui.TextStyle
+	lineHeight float32
 	theme      term.Theme
 	scrollback int
 	cursor     term.CursorStyle
@@ -20,6 +21,7 @@ type liveRecorder struct {
 }
 
 func (r *liveRecorder) SetTextStyle(ts gui.TextStyle)     { r.style = ts }
+func (r *liveRecorder) SetLineHeight(v float32)           { r.lineHeight = v }
 func (r *liveRecorder) SetTheme(th term.Theme)            { r.theme = th }
 func (r *liveRecorder) SetScrollbackRows(n int)           { r.scrollback = n }
 func (r *liveRecorder) SetCursorStyle(s term.CursorStyle) { r.cursor = s }
@@ -31,6 +33,7 @@ func TestApplyTermConfig(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Font.Family = "Fira Code"
 	cfg.Font.Size = 14
+	cfg.Font.LineHeight = 1.25
 	cfg.Theme.Name = "Some Theme"
 	cfg.Terminal.ScrollbackRows = 1234
 	cfg.Terminal.CursorStyle = "bar"
@@ -46,6 +49,9 @@ func TestApplyTermConfig(t *testing.T) {
 
 	if want := (gui.TextStyle{Family: "Fira Code", Size: 14}); rec.style != want {
 		t.Errorf("TextStyle = %+v, want %+v", rec.style, want)
+	}
+	if rec.lineHeight != 1.25 {
+		t.Errorf("LineHeight = %v, want 1.25", rec.lineHeight)
 	}
 	if !reflect.DeepEqual(rec.theme, term.DefaultTheme) {
 		t.Error("SetTheme was not called with the resolved theme")

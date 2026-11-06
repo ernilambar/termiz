@@ -14,6 +14,7 @@ import (
 func termConfig(cfg config, named term.NamedTheme, command string, env []string, dir string) term.Cfg {
 	return term.Cfg{
 		TextStyle:       gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)},
+		LineHeight:      float32(cfg.Font.LineHeight),
 		ScrollbackRows:  cfg.Terminal.ScrollbackRows,
 		CursorStyle:     cursorStyle(cfg.Terminal.CursorStyle),
 		CursorBlink:     cfg.Terminal.CursorBlink,
