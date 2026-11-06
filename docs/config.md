@@ -45,6 +45,14 @@ cursor_blink    = true
 cursor_lock     = false    # ignore a child's DECSCUSR cursor changes
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: last session's directory, then home
+allow_osc52     = false  # let programs write the clipboard (OSC 52)
+download_dir    = ""     # OSC 1337 File= transfers; empty: disabled
+
+[keybindings]
+copy           = "Cmd+Shift+C"
+font-inc       = "Cmd+="
+scroll-page-up = "none"  # hand PageUp back to the child
+"copy-mode.down" = "Ctrl+N"
 ```
 
 ## Keys
@@ -54,6 +62,7 @@ dir             = ""     # empty: last session's directory, then home
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `config_file` | string | `""` | Another file to load as a base before this one; see [Includes](#includes). |
+| `[keybindings]` | table | — | Terminal key overrides; see [`[keybindings]`](#keybindings). |
 
 ### `[window]`
 
@@ -115,6 +124,8 @@ partial palette fallback.
 | `cursor_lock` | bool | `false` | Ignore the child's cursor-shape requests (DECSCUSR) for the life of the window. |
 | `shell` | string | `""` | Shell to run. Empty selects `$SHELL`, then the OS login shell. |
 | `dir` | string | `""` | Starting directory. Empty restores the previous session's directory, then home. |
+| `allow_osc52` | bool | `false` | Let a program write the system clipboard through OSC 52. |
+| `download_dir` | string | `""` | Directory for OSC 1337 `File=` transfers. Empty disables transfers. |
 
 `cursor_style` is matched case-insensitively, and `beam` is accepted as a
 synonym for `bar`; an empty value keeps `block`, while any other spelling is
@@ -140,6 +151,59 @@ so subshells and tools that re-exec `$SHELL` agree with the window.
 relative to the home directory. The value must name an
 existing directory at load time; otherwise it is logged and treated as empty,
 falling through to the previous session's directory and then home.
+
+`allow_osc52` lets a program write the system clipboard with OSC 52. It is
+off by default because any output in the pane — a hostile banner, a script you
+ran, a remote login — could otherwise replace the clipboard silently, and a
+planted payload runs with your privileges at the next paste. Turn it on only
+for programs you trust.
+
+`download_dir` enables OSC 1337 `File=` transfers (iTerm2's `imgcat -d`,
+`it2dl`) and names where they are saved. Empty, the default, disables them:
+terminal output must not create files on its own authority. Files land with
+0600 permissions and never overwrite an existing name — a collision gets a
+`" (N)"` suffix. The directory is created on first use; a path that exists but
+is not a directory is logged and disables transfers. `~` and `$VAR` expand,
+and a relative path resolves against the home directory.
+
+### `[keybindings]`
+
+Each entry rebinds one of go-term's terminal actions. A name may be bare
+(`copy`), namespaced (`term.copy`), or written as a nested table
+(`[keybindings.term]`); all three spell the same action. Quote a dotted name
+that is not meant as a table: `"copy-mode.down" = "Ctrl+N"`.
+
+A chord is modifiers first, then the key, joined with `+`. Modifiers are
+`Cmd` (alias `Super`), `Ctrl`, `Alt` (alias `Opt`) and `Shift`; matching is
+case-insensitive. Key names are `A`–`Z`, `0`–`9`, `F1`–`F25`, `Space`,
+`Enter`/`Return`, `Escape`/`Esc`, `Tab`, `Backspace`, `Delete`/`Del`,
+`Insert`, `Home`, `End`, `PageUp`, `PageDown`, `Left`, `Right`, `Up`, `Down`,
+and the punctuation keys `[` `]` `\` `/` `;` `,` `.` `-` `=` `` ` `` (also
+spelled `LeftBracket`, `Backslash`, `Slash`, `Semicolon`, `Comma`, `Period`,
+`Minus`, `Equal`, `GraveAccent`).
+
+```toml
+[keybindings]
+copy           = "Cmd+Shift+C"
+find           = "Cmd+F"
+scroll-page-up = "none"   # hand PageUp back to the child
+"copy-mode.down" = "Ctrl+N"
+```
+
+The terminal actions are `copy`, `paste`, `find`, `toggle-regex`,
+`next-match`, `prev-match`, `prev-prompt`, `next-prompt`, `jump-failure`,
+`select-output`, `select-all`, `scroll-page-up`, `scroll-page-down`,
+`scroll-top`, `scroll-bottom`, `font-inc`, `font-dec`, `font-reset`,
+`copy-mode`, `hints`, `hints-copy`, and the `copy-mode.*` navigation actions
+(`copy-mode.down`, `copy-mode.yank`, …).
+
+`none` — or an empty value — unbinds the action, which hands the key back to
+the shell; this is how you free `Ctrl+R` for a shell's reverse-i-search. An
+unknown action, an unparseable chord, and a second entry claiming a chord
+already taken by an earlier entry are logged and ignored. An override
+replaces the action's whole built-in chord list rather than adding to it, and
+only terminal actions are rebindable — window commands such as Quit and
+Settings belong to the native menu.
 
 ## Precedence
 

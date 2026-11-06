@@ -130,23 +130,9 @@ func launch() {
 			installMenubar(w.App())
 
 			var err error
-			tm, err = term.New(w, term.Cfg{
-				TextStyle:       gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)},
-				ScrollbackRows:  cfg.Terminal.ScrollbackRows,
-				CursorStyle:     cursorStyle(cfg.Terminal.CursorStyle),
-				CursorBlink:     cfg.Terminal.CursorBlink,
-				CursorLocked:    cfg.Terminal.CursorLock,
-				Identity:        "termiz",
-				IdentityVersion: version,
-				Command:         command,
-				Args:            shellArgs(command),
-				Env:             env,
-				Dir:             dir,
-				// The first entry seeds the grid and the COLORFGBG the child
-				// is spawned with; after that the grid is the source of truth.
-				Themes: []term.NamedTheme{named},
-				OnExit: w.Close,
-			})
+			tc := termConfig(cfg, named, command, env, dir)
+			tc.OnExit = w.Close
+			tm, err = term.New(w, tc)
 			if err != nil {
 				log.Printf("term.New: %v", err)
 				w.Close()

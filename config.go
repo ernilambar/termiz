@@ -38,12 +38,19 @@ import (
 //	name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
 //
 //	[terminal]
-//	scrollback_rows = 10000
-//	cursor_style    = "block"  # block, underline or bar
-//	cursor_blink    = true
-//	cursor_lock     = false    # ignore a child's DECSCUSR
-//	shell           = ""   # empty: $SHELL, then the OS login shell
-//	dir             = ""   # empty: last session's directory, then home
+//	scrollback_rows   = 10000
+//	cursor_style      = "block"  # block, underline or bar
+//	cursor_blink      = true
+//	cursor_lock       = false    # ignore a child's DECSCUSR
+//	shell             = ""   # empty: $SHELL, then the OS login shell
+//	dir               = ""   # empty: last session's directory, then home
+//	allow_osc52       = false   # programs may write the clipboard
+//	download_dir      = ""      # OSC 1337 downloads; empty: disabled
+//
+//	[keybindings]
+//	copy      = "Cmd+C"
+//	font-inc  = "Cmd+="
+//	"copy-mode.down" = "Ctrl+N"
 //
 // Reading is deliberately forgiving: a file with a syntax error is ignored
 // whole, while a bad value, a value of the wrong type or an unknown key is
@@ -63,6 +70,12 @@ type config struct {
 	Font     fontConfig     `toml:"font"`
 	Theme    themeConfig    `toml:"theme"`
 	Terminal terminalConfig `toml:"terminal"`
+
+	// Keybindings overrides go-term's Term-level keyboard actions. The map
+	// value is a chord such as "Cmd+Shift+C"; "none" unbinds the action so
+	// the key reaches the child. Names are bare ("copy") or namespaced
+	// ("term.copy"); the map is validated in normalize.
+	Keybindings map[string]string `toml:"keybindings"`
 }
 
 type windowConfig struct {
@@ -120,6 +133,14 @@ type terminalConfig struct {
 	// the directory the previous session ended in (see state.go), falling back
 	// to the home directory when there is none or it no longer exists.
 	Dir string `toml:"dir"`
+	// AllowOSC52 lets a program write the system clipboard through OSC 52.
+	// Off by default because any output in the pane could otherwise replace
+	// the clipboard silently, and a planted payload runs on the next paste.
+	AllowOSC52 bool `toml:"allow_osc52"`
+	// DownloadDir is where OSC 1337 File= transfers are saved. Empty disables
+	// file transfers, which is the default: terminal output must not create
+	// files on its own authority. The directory is created on first use.
+	DownloadDir string `toml:"download_dir"`
 }
 
 // Defaults are the values the app has always started with.
@@ -260,6 +281,13 @@ func applyKeys(path string, doc map[string]any, cfg *config) []string {
 	var warnings []string
 	for _, top := range sortedKeys(doc) {
 		v := doc[top]
+		// keybindings is a free-form table of action -> chord. Its keys are
+		// action names, not struct fields, so they bypass the unknown-key
+		// machinery and are validated in normalize instead.
+		if top == "keybindings" {
+			warnings = append(warnings, applyKeybindings(path, v, cfg)...)
+			continue
+		}
 		table, isTable := v.(map[string]any)
 		if !isTable {
 			warnings = append(warnings, decodeKey(path, top, map[string]any{top: v}, cfg)...)
@@ -271,6 +299,59 @@ func applyKeys(path string, doc map[string]any, cfg *config) []string {
 		for _, k := range sortedKeys(table) {
 			one := map[string]any{top: map[string]any{k: table[k]}}
 			warnings = append(warnings, decodeKey(path, top+"."+k, one, cfg)...)
+		}
+	}
+	return warnings
+}
+
+// applyKeybindings merges the [keybindings] table over cfg's map. The table
+// may be written flat ("copy = ..."), as a quoted dotted key
+// ("term.copy" = ...) or as nested tables ([keybindings.term]); flattenBindings
+// joins those spellings back into one action name per entry.
+//
+// Values from a later file win per action, so an included config can set the
+// common bindings while the including file changes only one of them.
+func applyKeybindings(path string, v any, cfg *config) []string {
+	table, ok := v.(map[string]any)
+	if !ok {
+		return []string{fmt.Sprintf("%s: keybindings must be a table; ignored", path)}
+	}
+	entries := make(map[string]string, len(table))
+	warnings := flattenBindings(path, "keybindings", table, entries, 0)
+
+	merged := make(map[string]string, len(cfg.Keybindings)+len(entries))
+	for name, chord := range cfg.Keybindings {
+		merged[name] = chord
+	}
+	for name, chord := range entries {
+		merged[name] = chord
+	}
+	cfg.Keybindings = merged
+	return warnings
+}
+
+// maxBindingDepth bounds how far a nested [keybindings] table is flattened.
+// The deepest real name, term.copy-mode.half-page-up, is three levels below
+// keybindings.
+const maxBindingDepth = 4
+
+// flattenBindings walks a [keybindings] table, writing each leaf into out as
+// name -> chord. Nested tables are joined with dots so [keybindings.term] and
+// "term.copy" name the same action.
+func flattenBindings(path, prefix string, table map[string]any, out map[string]string, depth int) []string {
+	if depth > maxBindingDepth {
+		return []string{fmt.Sprintf("%s: %s nested too deep; ignored", path, prefix)}
+	}
+	var warnings []string
+	for _, k := range sortedKeys(table) {
+		name := prefix + "." + k
+		switch v := table[k].(type) {
+		case string:
+			out[strings.TrimPrefix(name, "keybindings.")] = v
+		case map[string]any:
+			warnings = append(warnings, flattenBindings(path, name, v, out, depth+1)...)
+		default:
+			warnings = append(warnings, fmt.Sprintf("%s: %s has the wrong type; ignored", path, name))
 		}
 	}
 	return warnings
@@ -381,6 +462,28 @@ func normalize(c *config) []string {
 		}
 	}
 
+	// download_dir is where OSC 1337 File= transfers land. It may not exist
+	// yet — go-term creates it on first use — so only an existing non-directory
+	// is a repair. A relative path resolves against home, like terminal.dir,
+	// because a Finder launch's working directory is "/".
+	if c.Terminal.DownloadDir != "" {
+		dir := expandPath(c.Terminal.DownloadDir)
+		if !filepath.IsAbs(dir) {
+			if home, err := os.UserHomeDir(); err == nil {
+				dir = filepath.Join(home, dir)
+			}
+		}
+		if !filepath.IsAbs(dir) {
+			warn("terminal.download_dir %q is not an absolute path; disabling transfers", c.Terminal.DownloadDir)
+			c.Terminal.DownloadDir = ""
+		} else if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+			warn("terminal.download_dir %q is not a directory; disabling transfers", c.Terminal.DownloadDir)
+			c.Terminal.DownloadDir = ""
+		} else {
+			c.Terminal.DownloadDir = dir
+		}
+	}
+
 	// A shell that cannot be found would make the window close the moment it
 	// opens, so it is checked here and the login shell used instead. A bare
 	// name missing from this process's PATH, which for a Finder launch is
@@ -409,6 +512,10 @@ func normalize(c *config) []string {
 			c.Theme.Name = nt.Name
 		}
 	}
+
+	var kbWarnings []string
+	c.Keybindings, kbWarnings = normalizeKeybindings(c.Keybindings)
+	warnings = append(warnings, kbWarnings...)
 
 	return warnings
 }

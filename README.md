@@ -95,6 +95,13 @@ cursor_blink    = true
 cursor_lock     = false  # ignore a child's cursor-shape requests
 shell           = ""     # empty: $SHELL, then the OS login shell
 dir             = ""     # empty: last session's directory, then home
+allow_osc52     = false  # let programs write the clipboard (OSC 52)
+download_dir    = ""     # OSC 1337 File= transfers; empty: disabled
+
+[keybindings]
+copy           = "Cmd+Shift+C"
+scroll-page-up = "none"   # hand PageUp back to the child
+"copy-mode.down" = "Ctrl+N"
 ```
 
 The cursor keys select the shape the window starts with — `block`,
@@ -150,6 +157,27 @@ otherwise from the shell process itself, so no
 shell setup is required. A first launch, or a saved directory that no longer
 exists, falls back to home. Naming `terminal.dir` pins the start directory:
 that value wins and the state file is not rewritten.
+
+`terminal.allow_osc52` lets a program write the system clipboard through OSC
+52. It is off because any output in the pane could otherwise replace the
+clipboard silently, and a planted payload runs at the next paste; enable it
+only for programs you trust. `terminal.download_dir` enables OSC 1337
+`File=` transfers (iTerm2's `imgcat -d`, `it2dl`) into that directory; empty,
+the default, disables them. Files land with 0600 permissions and never
+overwrite an existing name. `~` and `$VAR` expand in both paths, a relative
+path resolves against your home directory, and an existing non-directory is
+logged and disables the feature.
+
+`[keybindings]` rebinds go-term's terminal actions. Use a bare name (`copy`),
+the namespaced form (`term.copy`), or a nested table (`[keybindings.term]`);
+quote dotted names such as `"copy-mode.down"`. Chords are modifiers
+(`Cmd`/`Super`, `Ctrl`, `Alt`/`Opt`, `Shift`) and a key joined with `+`, such
+as `Cmd+Shift+C`, `Ctrl+[`, or `F12`; spelling is case-insensitive. `none`
+unbinds the action and hands the key back to the shell, which is how you free
+`Ctrl+R` for reverse-i-search. An unknown action, an unparseable chord, and
+two entries claiming the same chord are logged and ignored. An override
+replaces that action's built-in chords; the window menu commands are not
+rebindable.
 
 `theme.name` selects one of the 602 color themes go-term bundles (the
 iTerm2-Color-Schemes corpus), matched case-insensitively so `catppuccin mocha`

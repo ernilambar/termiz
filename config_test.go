@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -22,7 +23,7 @@ func TestReadConfigDefaultsWhenMissing(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("warnings = %q, want none", warnings)
 	}
-	if want := defaultConfig(); cfg != want {
+	if want := defaultConfig(); !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("cfg = %+v, want defaults %+v", cfg, want)
 	}
 }
@@ -165,7 +166,7 @@ func TestReadConfigIgnoresUnparseableFile(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %q, want the parse error", warnings)
 	}
-	if want := defaultConfig(); cfg != want {
+	if want := defaultConfig(); !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("cfg = %+v, want defaults %+v", cfg, want)
 	}
 }
@@ -378,7 +379,7 @@ func TestReadConfigSyntaxErrorIgnoresFile(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %q, want one parse error", warnings)
 	}
-	if cfg != defaultConfig() {
+	if !reflect.DeepEqual(cfg, defaultConfig()) {
 		t.Errorf("cfg = %+v, want defaults", cfg)
 	}
 }
@@ -426,5 +427,109 @@ func TestShellArgs(t *testing.T) {
 		if got := len(shellArgs(tc.in)) == 1; got != tc.want {
 			t.Errorf("shellArgs(%q) login = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestReadConfigDownloadDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg, warnings := readConfig(writeConfig(t, "[terminal]\ndownload_dir = \"~/Downloads/termiz\"\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	if want := filepath.Join(home, "Downloads", "termiz"); cfg.Terminal.DownloadDir != want {
+		t.Errorf("DownloadDir = %q, want %q", cfg.Terminal.DownloadDir, want)
+	}
+
+	cfg, warnings = readConfig(writeConfig(t, "[terminal]\ndownload_dir = \"downloads\"\n"))
+	if len(warnings) != 0 {
+		t.Fatalf("relative warnings = %q, want none", warnings)
+	}
+	if want := filepath.Join(home, "downloads"); cfg.Terminal.DownloadDir != want {
+		t.Errorf("relative DownloadDir = %q, want %q", cfg.Terminal.DownloadDir, want)
+	}
+
+	file := filepath.Join(home, "not-a-dir")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, warnings = readConfig(writeConfig(t, fmt.Sprintf("[terminal]\ndownload_dir = %q\n", file)))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "terminal.download_dir") {
+		t.Fatalf("warnings = %q, want one naming terminal.download_dir", warnings)
+	}
+	if cfg.Terminal.DownloadDir != "" {
+		t.Errorf("DownloadDir = %q, want empty after the repair", cfg.Terminal.DownloadDir)
+	}
+}
+
+func TestReadConfigKeybindings(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, `
+[keybindings]
+copy = "Cmd+Shift+C"
+"term.find" = "Cmd+G"
+font-inc = "none"
+
+[keybindings.term.copy-mode]
+down = "Ctrl+N"
+`))
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	want := map[string]string{
+		"term.copy":           "Cmd+Shift+C",
+		"term.find":           "Cmd+G",
+		"term.font-inc":       "none",
+		"term.copy-mode.down": "Ctrl+N",
+	}
+	if !reflect.DeepEqual(cfg.Keybindings, want) {
+		t.Errorf("Keybindings = %v, want %v", cfg.Keybindings, want)
+	}
+}
+
+func TestReadConfigKeybindingsWarn(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[keybindings]\nnope = \"Cmd+J\"\ncopy = \"NotAChord\"\n"))
+	if len(warnings) != 2 {
+		t.Fatalf("warnings = %q, want two", warnings)
+	}
+	for _, needle := range []string{"keybindings.nope", "keybindings.copy"} {
+		var found bool
+		for _, w := range warnings {
+			if strings.Contains(w, needle) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("warnings %q do not mention %s", warnings, needle)
+		}
+	}
+	if len(cfg.Keybindings) != 0 {
+		t.Errorf("Keybindings = %v, want none after both entries were dropped", cfg.Keybindings)
+	}
+}
+
+func TestReadConfigKeybindingsWrongType(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[keybindings]\ncopy = 5\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "keybindings.copy") {
+		t.Fatalf("warnings = %q, want one naming keybindings.copy", warnings)
+	}
+	if len(cfg.Keybindings) != 0 {
+		t.Errorf("Keybindings = %v, want none", cfg.Keybindings)
+	}
+}
+
+func TestReadConfigKeybindingsMergeAcrossInclude(t *testing.T) {
+	dir := t.TempDir()
+	writeConfigAt(t, filepath.Join(dir, "included.toml"), "[keybindings]\ncopy = \"Cmd+J\"\nfind = \"Ctrl+F\"\n")
+	path := filepath.Join(dir, "config.toml")
+	writeConfigAt(t, path, "config_file = \"included.toml\"\n\n[keybindings]\nfind = \"Cmd+G\"\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
+	}
+	want := map[string]string{"term.copy": "Cmd+J", "term.find": "Cmd+G"}
+	if !reflect.DeepEqual(cfg.Keybindings, want) {
+		t.Errorf("Keybindings = %v, want %v", cfg.Keybindings, want)
 	}
 }
