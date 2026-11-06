@@ -9,26 +9,20 @@ font, theme, and terminal.
 
 ## Quick start
 
-The release bundle is macOS arm64 only, ad hoc signed, and needs one Gatekeeper
-exception. `<Name>` is the display name in `appinfo.toml`:
+Homebrew is the primary install; macOS on Apple silicon is required.
 
 ```bash
-unzip <Name>-macos-arm64.zip
-xattr -dr com.apple.quarantine <Name>.app
-mv <Name>.app /Applications/
-open /Applications/<Name>.app
+brew tap ernilambar/tap
+brew trust ernilambar/tap
+brew install --cask termiz
 ```
 
-To build from source, install Go 1.27.3+ and the Xcode Command Line Tools
-(`xcode-select --install`), then:
+The cask installs `Termiz.app` and removes the quarantine flag the ad hoc
+signature would otherwise leave on it. Update it with
+`brew upgrade --cask termiz`.
 
-```bash
-go build -o termiz .
-./termiz
-```
-
-See [Installing](docs/install.md) for requirements, the app-bundle scripts, and
-the `termiz` command-line shim.
+For the release zip, a source build, the app-bundle scripts, and the `termiz`
+command-line shim, see [Installing](docs/install.md).
 
 ## Usage
 
@@ -69,7 +63,7 @@ The full key reference, defaults, includes, and error behavior are in
 
 ## Documentation
 
-- [Installing](docs/install.md) — releases, source builds, scripts, CLI shim.
+- [Installing](docs/install.md) — Homebrew, releases, source builds, CLI shim.
 - [Using termiz](docs/usage.md) — commands, menus, shell, session, log.
 - [Configuration](docs/config.md) — every key, defaults, includes, errors.
 - [Contributing](CONTRIBUTING.md) — workflow and the quality gate.

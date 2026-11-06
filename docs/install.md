@@ -12,7 +12,28 @@ Running the bare binary needs Go 1.27.3+ and the Xcode Command Line Tools
 `appinfo.toml`; its `name` is the display name used everywhere below as
 `<Name>`.
 
-## Install a release
+## Install with Homebrew
+
+The primary install is the `termiz` cask in
+[ernilambar/tap](https://github.com/ernilambar/homebrew-tap). Homebrew does not
+load a third-party tap until it is trusted, so tap and trust it first:
+
+```bash
+brew tap ernilambar/tap
+brew trust ernilambar/tap
+brew install --cask termiz
+```
+
+The cask requires macOS on arm64 and installs `Termiz.app` into the usual
+`/Applications` location. Its postflight removes the quarantine attribute, so
+the ad hoc-signed bundle launches without a Gatekeeper detour. Updates arrive
+through the tap:
+
+```bash
+brew upgrade --cask termiz
+```
+
+## Install a release manually
 
 Pushing a `v*` tag publishes `<Name>-macos-arm64.zip` and `SHA256SUMS` on the
 GitHub release. The bundle is ad hoc signed, so macOS quarantines it and
@@ -85,6 +106,15 @@ An unknown argument prints the usage to stderr and exits with status 2 without
 opening a window.
 
 ## Uninstall
+
+When installed with Homebrew:
+
+```bash
+brew uninstall --cask termiz
+brew untap ernilambar/tap   # once no other cask from the tap is installed
+```
+
+A manual install removes the bundle and the CLI shim directly:
 
 ```bash
 rm -rf "/Applications/<Name>.app"
