@@ -2,52 +2,38 @@
 
 **One window. One shell. Nothing in the way.**
 
-A minimal, GPU-accelerated terminal emulator for macOS. It gives you a real
-shell on a PTY in a small native window — no browser engine, no tabs, no panes,
-and one optional file to change the window, the font, the theme and the
-terminal.
+A minimal, GPU-accelerated terminal emulator for macOS. A real shell runs on a
+PTY in a small native window rendered by go-gui and go-term — no browser
+engine, no tabs, no panes, and one optional TOML file to change the window,
+font, theme, and terminal.
 
-## Install
+## Quick start
 
-Releases ship a single macOS arm64 app bundle; Intel Macs and universal
-binaries are not supported. Pushing a `v*` tag publishes
-`<Name>-macos-arm64.zip` and `SHA256SUMS`, where `<Name>` is the display name in
-`appinfo.toml`.
+The release bundle is macOS arm64 only, ad hoc signed, and needs one Gatekeeper
+exception. `<Name>` is the display name in `appinfo.toml`:
 
 ```bash
 unzip <Name>-macos-arm64.zip
-xattr -dr com.apple.quarantine <Name>.app  # release bundle is ad hoc signed
+xattr -dr com.apple.quarantine <Name>.app
 mv <Name>.app /Applications/
 open /Applications/<Name>.app
 ```
 
-## Build and run
-
-Requires Go 1.27.3+ and macOS on Apple silicon with a C toolchain (the Metal
-backend is Objective-C). Linux and Windows are not supported.
+To build from source, install Go 1.27.3+ and the Xcode Command Line Tools
+(`xcode-select --install`), then:
 
 ```bash
 go build -o termiz .
 ./termiz
 ```
 
-Or use the scripts. `dev.sh` builds the app bundle with go-gui's `buildapp`,
-installs it to `/Applications`, installs a `termiz` command and relaunches the
-app; `bundle.sh` runs the quality gate and produces the same archive the
-release workflow publishes:
+See [Installing](docs/install.md) for requirements, the app-bundle scripts, and
+the `termiz` command-line shim.
 
-```bash
-./scripts/dev.sh             # debug build, install app + CLI, relaunch
-./scripts/dev.sh --release   # release build, verify arm64, install, relaunch
-./scripts/bundle.sh          # gate, release build, dist/<Name>-macos-arm64.zip
-```
+## Usage
 
-The `termiz` command goes in `/usr/local/bin` when that directory is writable,
-otherwise in `~/.local/bin`; set `TERMIZ_BIN_DIR` to pick another directory.
-The script prints a `PATH` hint when the chosen directory is not on it.
-
-With no arguments, `termiz` opens the window. The command line otherwise only
-carries informational commands:
+With no arguments, `termiz` opens the window on your login shell. The remaining
+commands are informational:
 
 ```bash
 termiz --help      # or -h, or `help`
@@ -55,153 +41,38 @@ termiz --version   # or -V, or `version`
 termiz themes      # list the bundled color themes
 ```
 
-Run them as `./termiz …` to use the repository build instead. The version
-printed is `version` in `main.go`, the same value the release tag must match
-and the bundled app reports to its children.
+The app menu holds `Settings…` (⌘,) and `Reload Configuration` (⌘⇧,). See
+[Using termiz](docs/usage.md) for the window, menus, shell, session, and log.
 
 ## Configuration
 
-The app reads one optional file: `$XDG_CONFIG_HOME/termiz/config.toml`, or
-`~/.config/termiz/config.toml` when `XDG_CONFIG_HOME` is unset. It is read at
-startup; `Termiz > Reload Configuration` (⌘⇧,) re-reads it without restarting
-the shell, applying the theme, font, scrollback, cursor, keybindings, padding
-and quit-confirmation settings. Window geometry, `terminal.shell`, `terminal.dir`,
-`allow_osc52` and `download_dir` need a restart, which the log reports. Everything is optional; a
-missing file means the defaults below. Unknown keys and out-of-range values are
-logged and replaced by the default, so a typo never keeps the window from
-opening. The log is `~/Library/Logs/termiz.log` (also in Console.app); check it
-when a setting seems ignored or the window closes on launch. The app writes one file of its own, the state file described under
-`terminal.dir`, and never touches the config.
+Settings live in one optional file, `$XDG_CONFIG_HOME/termiz/config.toml`
+(`~/.config/termiz/config.toml` when `XDG_CONFIG_HOME` is unset):
 
 ```toml
-config_file = "~/dotfiles/termiz/config.toml"  # optional: load this first
-
 [window]
-maximize        = true   # fill the screen's visible area on launch
-confirm_on_quit = false  # ask before closing a running shell
-width           = 1000
-height          = 640
-min_width       = 400
-min_height      = 240
-padding         = 8       # 0–64; inset from the window edge to the terminal
+maximize = true
 
 [font]
 family = "Menlo"
-size   = 12          # 6–72
+size   = 12
 
 [theme]
-name = "Catppuccin Mocha"  # any bundled theme; empty: go-term's default
-
-[terminal]
-scrollback_rows = 10000  # 0: go-term's 5000 rows, negative: no scrollback
-cursor_style    = "block"  # block, underline or bar
-cursor_blink    = true
-cursor_lock     = false  # ignore a child's cursor-shape requests
-shell           = ""     # empty: $SHELL, then the OS login shell
-dir             = ""     # empty: last session's directory, then home
-allow_osc52     = false  # let programs write the clipboard (OSC 52)
-download_dir    = ""     # OSC 1337 File= transfers; empty: disabled
-
-[keybindings]
-copy           = "Cmd+Shift+C"
-scroll-page-up = "none"   # hand PageUp back to the child
-"copy-mode.down" = "Ctrl+N"
+name = "Catppuccin Mocha"
 ```
 
-The cursor keys select the shape the window starts with — `block`,
-`underline`, or `bar` (case-insensitive, and `beam` is accepted for `bar`) —
-whether it blinks, and whether the window obeys the child's own cursor
-requests. With `cursor_lock` off, which is the default, an editor can switch
-to a bar for insert mode (vim does); setting it to `true` pins the configured
-shape and blink for the life of the window. `reset` returns to the configured
-cursor either way. An unknown style is logged and replaced by `block`.
+Every key is optional; a missing file means the built-in defaults, and a
+malformed value is logged and replaced rather than stopping startup.
+`Termiz > Reload Configuration` re-reads the file without restarting the shell.
+The full key reference, defaults, includes, and error behavior are in
+[Configuration](docs/config.md).
 
-`window.maximize`, on by default, opens the window filling the screen's
-visible area — the same as the Window > Zoom menu item. Set it to `false` to
-open at `width`×`height` instead.
+## Documentation
 
-`window.confirm_on_quit`, off by default, asks for confirmation when the window
-is closed or the app quits while the shell is still running, so ⌘Q cannot
-silently kill a job. The shell exiting on its own closes the window without a
-prompt. Set it to `true` to turn the prompt on.
-
-`window.padding` is the inset, in points, between the window edge and the
-terminal, and defaults to `8`. The terminal keeps a 4 px inset of its own
-inside it, so text starts `padding + 4` points from each edge; `0` is allowed
-and leaves only that inner inset. Values outside `0`–`64` are logged and
-replaced by `8`.
-
-`config_file` lets a config live anywhere — a dotfiles repository, for
-instance — while the file at the path above stays a one-line pointer. The named
-file is loaded first and the file holding the key is applied on top, so the
-pointer's own values win if it sets any. A relative path resolves against the
-directory of the file that names it, and `~` and `$VAR` expand. A missing
-target, a cycle, or a chain more than 8 files deep is logged and skipped; the
-rest of the file still applies.
-
-`Termiz > Settings…` (⌘,) runs `$VISUAL`, then `$EDITOR`, and opens
-this file with it, looked up in your shell's `PATH` (`~/.zprofile` and
-`~/.zshrc` both count) so `code -w` or `subl -w` work from a Dock launch. When neither is set, the command is not
-found, or it is a terminal editor such as vim or nano, the default text editor
-opens it. The
-directory is created when missing, and a missing file is created with a comment
-pointing at `docs/config.md`. The app never writes a setting, so the editor is
-the one that changes the contents.
-
-`terminal.shell` outranks `$SHELL`: a shell named in the file is the one the
-window runs, and the child is given the matching `SHELL`. Leave it empty to
-keep the `$SHELL` → OS login shell resolution. The shell starts as a login
-shell, so `~/.zprofile` (Homebrew's `PATH` setup) runs.
-
-With `terminal.dir` empty the shell starts where the previous session ended,
-so quitting and reopening resumes in the same directory. termiz records the
-shell's directory while the session runs (a 2-second sampler that writes only
-when it changes, and again on close) in
-`$XDG_STATE_HOME/termiz/state.toml` (`~/.local/state/termiz/state.toml` when
-`XDG_STATE_HOME` is unset) and restores it on the next launch. Sampling is what
-keeps the directory when the shell exits on its own or the app is force-quit.
-The directory comes from the shell's OSC 7 report when it emits one — most
-shell integrations do; a report from a remote host over ssh is ignored — and
-otherwise from the shell process itself, so no
-shell setup is required. A first launch, or a saved directory that no longer
-exists, falls back to home. Naming `terminal.dir` pins the start directory:
-that value wins and the state file is not rewritten.
-
-`terminal.allow_osc52` lets a program write the system clipboard through OSC
-52. It is off because any output in the pane could otherwise replace the
-clipboard silently, and a planted payload runs at the next paste; enable it
-only for programs you trust. `terminal.download_dir` enables OSC 1337
-`File=` transfers (iTerm2's `imgcat -d`, `it2dl`) into that directory; empty,
-the default, disables them. Files land with 0600 permissions and never
-overwrite an existing name. `~` and `$VAR` expand in both paths, a relative
-path resolves against your home directory, and an existing non-directory is
-logged and disables the feature.
-
-`[keybindings]` rebinds go-term's terminal actions. Use a bare name (`copy`),
-the namespaced form (`term.copy`), or a nested table (`[keybindings.term]`);
-quote dotted names such as `"copy-mode.down"`. Chords are modifiers
-(`Cmd`/`Super`, `Ctrl`, `Alt`/`Opt`, `Shift`) and a key joined with `+`, such
-as `Cmd+Shift+C`, `Ctrl+[`, or `F12`; spelling is case-insensitive. `none`
-unbinds the action and hands the key back to the shell, which is how you free
-`Ctrl+R` for reverse-i-search. An unknown action, an unparseable chord, and
-two entries claiming the same chord are logged and ignored. An override
-replaces that action's built-in chords; the window menu commands are not
-rebindable.
-
-`theme.name` selects one of the 602 color themes go-term bundles (the
-iTerm2-Color-Schemes corpus), matched case-insensitively so `catppuccin mocha`
-and `Catppuccin Mocha` are the same theme; `termiz themes` prints the valid
-names, `Default` first. Empty, or `Default`, keeps go-term's built-in dark
-theme. The window chrome follows the chosen theme's light or dark character, so
-a light theme gets a light title bar and focus ring. An unknown name is logged
-and the default theme is used; there is no fallback to a half-applied palette.
-
-```bash
-termiz themes | grep -i catppuccin
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the
-checks a change must pass.
+- [Installing](docs/install.md) — releases, source builds, scripts, CLI shim.
+- [Using termiz](docs/usage.md) — commands, menus, shell, session, log.
+- [Configuration](docs/config.md) — every key, defaults, includes, errors.
+- [Contributing](CONTRIBUTING.md) — workflow and the quality gate.
 
 ## License
 
