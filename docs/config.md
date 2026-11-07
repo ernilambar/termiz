@@ -126,7 +126,7 @@ partial palette fallback.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `scrollback_rows` | int | `10000` | History rows kept above the screen. `0` keeps go-term's own default (5000), a positive value caps history, a negative value disables it. |
+| `scrollback_rows` | int | `10000` | History rows kept above the screen. `0` keeps go-term's own default (5000), a positive value caps history, a negative value disables it. A value above go-term's cap of 100000 is logged and replaced by 10000. |
 | `cursor_style` | string | `"block"` | Cursor shape: `block`, `underline` or `bar`. |
 | `cursor_blink` | bool | `true` | Whether the cursor blinks. |
 | `cursor_lock` | bool | `false` | Ignore the child's cursor-shape requests (DECSCUSR) for the life of the window. |
@@ -186,9 +186,9 @@ A chord is modifiers first, then the key, joined with `+`. Modifiers are
 case-insensitive. Key names are `A`–`Z`, `0`–`9`, `F1`–`F25`, `Space`,
 `Enter`/`Return`, `Escape`/`Esc`, `Tab`, `Backspace`, `Delete`/`Del`,
 `Insert`, `Home`, `End`, `PageUp`, `PageDown`, `Left`, `Right`, `Up`, `Down`,
-and the punctuation keys `[` `]` `\` `/` `;` `,` `.` `-` `=` `` ` `` (also
-spelled `LeftBracket`, `Backslash`, `Slash`, `Semicolon`, `Comma`, `Period`,
-`Minus`, `Equal`, `GraveAccent`).
+and the punctuation keys `'` `[` `]` `\` `/` `;` `,` `.` `-` `=` `` ` `` (also
+spelled `Apostrophe`, `LeftBracket`, `Backslash`, `Slash`, `Semicolon`,
+`Comma`, `Period`, `Minus`, `Equal`, `GraveAccent`).
 
 ```toml
 [keybindings]

@@ -8,7 +8,9 @@ import (
 	"github.com/go-gui-org/go-term/term"
 )
 
-// liveRecorder records the setter calls applyTermConfig makes.
+// liveRecorder records the setter calls applyTermConfig makes. calls keeps
+// the setter names in the order they ran, so a test can assert that an
+// unchanged key calls nothing.
 type liveRecorder struct {
 	style      gui.TextStyle
 	lineHeight float32
@@ -18,16 +20,33 @@ type liveRecorder struct {
 	blink      bool
 	locked     bool
 	keys       term.KeyMap
+	calls      []string
 }
 
-func (r *liveRecorder) SetTextStyle(ts gui.TextStyle)     { r.style = ts }
-func (r *liveRecorder) SetLineHeight(v float32)           { r.lineHeight = v }
-func (r *liveRecorder) SetTheme(th term.Theme)            { r.theme = th }
-func (r *liveRecorder) SetScrollbackRows(n int)           { r.scrollback = n }
-func (r *liveRecorder) SetCursorStyle(s term.CursorStyle) { r.cursor = s }
-func (r *liveRecorder) SetCursorBlink(on bool)            { r.blink = on }
-func (r *liveRecorder) SetCursorLocked(locked bool)       { r.locked = locked }
-func (r *liveRecorder) SetKeyBindings(km term.KeyMap)     { r.keys = km }
+func (r *liveRecorder) SetTextStyle(ts gui.TextStyle) {
+	r.style, r.calls = ts, append(r.calls, "SetTextStyle")
+}
+func (r *liveRecorder) SetLineHeight(v float32) {
+	r.lineHeight, r.calls = v, append(r.calls, "SetLineHeight")
+}
+func (r *liveRecorder) SetTheme(th term.Theme) {
+	r.theme, r.calls = th, append(r.calls, "SetTheme")
+}
+func (r *liveRecorder) SetScrollbackRows(n int) {
+	r.scrollback, r.calls = n, append(r.calls, "SetScrollbackRows")
+}
+func (r *liveRecorder) SetCursorStyle(s term.CursorStyle) {
+	r.cursor, r.calls = s, append(r.calls, "SetCursorStyle")
+}
+func (r *liveRecorder) SetCursorBlink(on bool) {
+	r.blink, r.calls = on, append(r.calls, "SetCursorBlink")
+}
+func (r *liveRecorder) SetCursorLocked(locked bool) {
+	r.locked, r.calls = locked, append(r.calls, "SetCursorLocked")
+}
+func (r *liveRecorder) SetKeyBindings(km term.KeyMap) {
+	r.keys, r.calls = km, append(r.calls, "SetKeyBindings")
+}
 
 func TestApplyTermConfig(t *testing.T) {
 	cfg := defaultConfig()
@@ -45,7 +64,8 @@ func TestApplyTermConfig(t *testing.T) {
 
 	named := term.NamedTheme{Name: "Some Theme", Theme: term.DefaultTheme}
 	rec := &liveRecorder{}
-	applyTermConfig(rec, cfg, named)
+	// The defaults differ in every compared key, so all eight setters run.
+	applyTermConfig(rec, defaultConfig(), cfg, named)
 
 	if want := (gui.TextStyle{Family: "Fira Code", Size: 14}); rec.style != want {
 		t.Errorf("TextStyle = %+v, want %+v", rec.style, want)
@@ -64,6 +84,29 @@ func TestApplyTermConfig(t *testing.T) {
 	}
 	if got := rec.keys[term.ActionCopy]; got != (gui.Shortcut{Key: gui.KeyC, Modifiers: gui.ModSuper | gui.ModShift}) {
 		t.Errorf("copy binding = %+v, want Cmd+Shift+C", got)
+	}
+}
+
+// An unchanged config must call no setter at all: SetTextStyle clears a
+// runtime font zoom and SetTheme discards the child's OSC 10/11 colors, so
+// pushing settings nothing changed would clobber them.
+func TestApplyTermConfigUnchangedCallsNothing(t *testing.T) {
+	cfg := defaultConfig()
+	rec := &liveRecorder{}
+	applyTermConfig(rec, cfg, cfg, term.NamedTheme{})
+	if len(rec.calls) != 0 {
+		t.Errorf("setters called = %v, want none", rec.calls)
+	}
+}
+
+func TestApplyTermConfigOnlyCallsChangedSetters(t *testing.T) {
+	old := defaultConfig()
+	next := old
+	next.Theme.Name = "Dracula"
+	rec := &liveRecorder{}
+	applyTermConfig(rec, old, next, term.NamedTheme{Name: "Dracula", Theme: term.DefaultTheme})
+	if want := []string{"SetTheme"}; !reflect.DeepEqual(rec.calls, want) {
+		t.Errorf("setters called = %v, want %v", rec.calls, want)
 	}
 }
 

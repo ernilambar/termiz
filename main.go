@@ -127,8 +127,10 @@ func launch() {
 		if !ok {
 			named, _ = lookupTheme("")
 		}
-		applyTermConfig(tm, next, named)
-		gui.SetTheme(chromeTheme(named.Theme))
+		applyTermConfig(tm, old, next, named)
+		if old.Theme != next.Theme {
+			gui.SetTheme(chromeTheme(named.Theme))
+		}
 		if next.Window.Padding != old.Window.Padding {
 			win.SetView(paddedView(tm, next.Window.Padding))
 		}
