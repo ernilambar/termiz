@@ -22,17 +22,33 @@ type liveSettings interface {
 	SetKeyBindings(term.KeyMap)
 }
 
-// applyTermConfig pushes the live terminal settings from cfg onto tm. It
+// applyTermConfig pushes the live terminal settings from cfg onto tm,
+// skipping every setter whose keys did not change since old: a reload must
+// not clobber runtime state a font zoom or the child itself changed. It
 // mirrors termConfig, the construction-time path; keep the two in step.
-func applyTermConfig(tm liveSettings, cfg config, named term.NamedTheme) {
-	tm.SetTextStyle(gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)})
-	tm.SetLineHeight(float32(cfg.Font.LineHeight))
-	tm.SetTheme(named.Theme)
-	tm.SetScrollbackRows(cfg.Terminal.ScrollbackRows)
-	tm.SetCursorStyle(cursorStyle(cfg.Terminal.CursorStyle))
-	tm.SetCursorBlink(cfg.Terminal.CursorBlink)
-	tm.SetCursorLocked(cfg.Terminal.CursorLock)
-	tm.SetKeyBindings(keyBindings(cfg.Keybindings))
+func applyTermConfig(tm liveSettings, old, cfg config, named term.NamedTheme) {
+	if old.Font != cfg.Font {
+		tm.SetTextStyle(gui.TextStyle{Family: cfg.Font.Family, Size: float32(cfg.Font.Size)})
+		tm.SetLineHeight(float32(cfg.Font.LineHeight))
+	}
+	if old.Theme != cfg.Theme {
+		tm.SetTheme(named.Theme)
+	}
+	if old.Terminal.ScrollbackRows != cfg.Terminal.ScrollbackRows {
+		tm.SetScrollbackRows(cfg.Terminal.ScrollbackRows)
+	}
+	if old.Terminal.CursorStyle != cfg.Terminal.CursorStyle {
+		tm.SetCursorStyle(cursorStyle(cfg.Terminal.CursorStyle))
+	}
+	if old.Terminal.CursorBlink != cfg.Terminal.CursorBlink {
+		tm.SetCursorBlink(cfg.Terminal.CursorBlink)
+	}
+	if old.Terminal.CursorLock != cfg.Terminal.CursorLock {
+		tm.SetCursorLocked(cfg.Terminal.CursorLock)
+	}
+	if !maps.Equal(old.Keybindings, cfg.Keybindings) {
+		tm.SetKeyBindings(keyBindings(cfg.Keybindings))
+	}
 }
 
 // configChanges compares two loaded configs and returns the config keys a

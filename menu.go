@@ -181,10 +181,27 @@ var terminalEditors = map[string]bool{
 }
 
 // isTerminalEditor reports whether the editor command's program is a known
-// terminal editor; "code -w" or a path to a GUI app's CLI is not.
+// terminal editor; "code -w" or a path to a GUI app's CLI is not. A leading
+// env and any NAME=value words are skipped, so EDITOR="env vim" is caught
+// too; sudo is out of scope.
 func isTerminalEditor(editor string) bool {
-	fields := strings.Fields(editor)
-	return len(fields) > 0 && terminalEditors[filepath.Base(fields[0])]
+	for i, field := range strings.Fields(editor) {
+		if i == 0 && field == "env" {
+			continue
+		}
+		if isEnvSetting(field) {
+			continue
+		}
+		return terminalEditors[filepath.Base(field)]
+	}
+	return false
+}
+
+// isEnvSetting reports whether word has the NAME=value form, the way a word
+// in an editor command names an environment entry rather than the program.
+func isEnvSetting(word string) bool {
+	name, _, ok := strings.Cut(word, "=")
+	return ok && name != ""
 }
 
 // seedConfig creates path with the reference header when it is missing. The

@@ -353,8 +353,58 @@ func TestReadConfigWarnsOnMissingConfigFile(t *testing.T) {
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "missing.toml") {
 		t.Fatalf("warnings = %q, want one naming missing.toml", warnings)
 	}
+	if cfg.unreadable {
+		t.Error("missing include target: unreadable = true, want false")
+	}
 	if cfg.Font.Size != 18 {
 		t.Errorf("Font.Size = %v, want the including file's 18 to still apply", cfg.Font.Size)
+	}
+}
+
+// A missing target two levels down must also survive a reload: only the
+// include naming it warns, and the file between still applies.
+func TestReadConfigMissingIncludeDeeperInChain(t *testing.T) {
+	dir := t.TempDir()
+	writeConfigAt(t, filepath.Join(dir, "included.toml"), "config_file = \"missing.toml\"\n\n[font]\nsize = 20\n")
+	path := filepath.Join(dir, "config.toml")
+	writeConfigAt(t, path, "config_file = \"included.toml\"\n")
+
+	cfg, warnings := readConfig(path)
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "missing.toml") {
+		t.Fatalf("warnings = %q, want one naming missing.toml", warnings)
+	}
+	if cfg.unreadable {
+		t.Error("missing include target: unreadable = true, want false")
+	}
+	if cfg.Font.Size != 20 {
+		t.Errorf("Font.Size = %v, want 20 from the surviving included file", cfg.Font.Size)
+	}
+}
+
+func TestReadConfigClampsScrollbackRows(t *testing.T) {
+	cfg, warnings := readConfig(writeConfig(t, "[terminal]\nscrollback_rows = 999999999\n"))
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "scrollback_rows") {
+		t.Fatalf("warnings = %q, want one naming scrollback_rows", warnings)
+	}
+	if cfg.Terminal.ScrollbackRows != defaultScrollback {
+		t.Errorf("ScrollbackRows = %d, want %d", cfg.Terminal.ScrollbackRows, defaultScrollback)
+	}
+
+	// Zero (go-term's default) and negative (disabled) are not repairs.
+	for _, tc := range []struct {
+		in   string
+		want int
+	}{
+		{"0", 0},
+		{"-1", -1},
+	} {
+		cfg, warnings := readConfig(writeConfig(t, "[terminal]\nscrollback_rows = "+tc.in+"\n"))
+		if len(warnings) != 0 {
+			t.Errorf("scrollback_rows = %s: warnings = %q, want none", tc.in, warnings)
+		}
+		if cfg.Terminal.ScrollbackRows != tc.want {
+			t.Errorf("scrollback_rows = %s: ScrollbackRows = %d, want %d", tc.in, cfg.Terminal.ScrollbackRows, tc.want)
+		}
 	}
 }
 

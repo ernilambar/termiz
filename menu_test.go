@@ -254,7 +254,10 @@ func TestIsTerminalEditor(t *testing.T) {
 		{"vim", true},
 		{"/opt/homebrew/bin/nvim", true},
 		{"nano -w", true},
+		{"env vim", true},
+		{"env TERM=xterm nvim", true},
 		{"code -w", false},
+		{"env code -w", false},
 		{"subl --wait", false},
 		{"", false},
 	} {

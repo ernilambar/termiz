@@ -268,11 +268,16 @@ func readConfigFile(path string, base config, depth int, seen map[string]bool) (
 	defer delete(seen, key)
 
 	// A syntax error makes the document meaningless, so the file is ignored
-	// whole; a value of the wrong type only costs that key (applyKeys).
+	// whole; a value of the wrong type only costs that key (applyKeys). A
+	// missing target deeper in the chain is only a warning: a deleted
+	// dotfile must not freeze the running settings against every reload.
 	var doc map[string]any
 	if _, err := toml.DecodeFile(path, &doc); err != nil {
-		if errors.Is(err, fs.ErrNotExist) && depth == 0 {
-			return base, nil
+		if errors.Is(err, fs.ErrNotExist) {
+			if depth == 0 {
+				return base, nil
+			}
+			return base, []string{fmt.Sprintf("%s: %v", path, err)}
 		}
 		base.unreadable = true
 		return base, []string{fmt.Sprintf("%s: %v", path, err)}
@@ -463,6 +468,14 @@ func normalize(c *config) []string {
 	if c.Font.LineHeight < 1 || c.Font.LineHeight > maxLineHeight {
 		warn("font.line_height must be between 1 and %d; using %g", maxLineHeight, defaultLineHeight)
 		c.Font.LineHeight = defaultLineHeight
+	}
+
+	// go-term clamps the cap silently, so an over-large value would load
+	// without a word: warn and fall back to the default instead. Zero
+	// (go-term's own default) and negative (disabled) stay valid.
+	if c.Terminal.ScrollbackRows > term.MaxScrollbackCap {
+		warn("terminal.scrollback_rows must be at most %d; using %d", term.MaxScrollbackCap, defaultScrollback)
+		c.Terminal.ScrollbackRows = defaultScrollback
 	}
 
 	if name, ok := cursorStyleName(c.Terminal.CursorStyle); !ok {
