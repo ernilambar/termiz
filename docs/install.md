@@ -46,6 +46,10 @@ mv <Name>.app /Applications/
 open /Applications/<Name>.app
 ```
 
+If you open the app from Finder without removing the attribute and macOS
+blocks it, open **System Settings > Privacy & Security** and click
+**Open Anyway**.
+
 Verify the archive first if you like:
 
 ```bash
