@@ -134,13 +134,15 @@ func TestConfigChangesLive(t *testing.T) {
 	next.Theme.Name = "Dracula"
 	next.Terminal.CursorStyle = "bar"
 	next.Keybindings = map[string]string{"term.copy": "Cmd+C"}
+	next.Window.Maximize = false
 	next.Window.Padding = 12
 	next.Window.ConfirmOnQuit = true
 
 	live, restart := configChanges(old, next)
 	wantLive := []string{
 		"font", "theme.name", "terminal.cursor_style",
-		"keybindings", "window.padding", "window.confirm_on_quit",
+		"keybindings", "window.maximize", "window.padding",
+		"window.confirm_on_quit",
 	}
 	if !reflect.DeepEqual(live, wantLive) {
 		t.Errorf("live = %v, want %v", live, wantLive)
@@ -153,7 +155,6 @@ func TestConfigChangesLive(t *testing.T) {
 func TestConfigChangesRestart(t *testing.T) {
 	old := defaultConfig()
 	next := old
-	next.Window.Maximize = false
 	next.Window.Width = 1200
 	next.Window.Height = 700
 	next.Window.MinWidth = 500
@@ -168,7 +169,7 @@ func TestConfigChangesRestart(t *testing.T) {
 		t.Errorf("live = %v, want none", live)
 	}
 	wantRestart := []string{
-		"window.maximize", "window.width", "window.height",
+		"window.width", "window.height",
 		"window.min_width", "window.min_height",
 		"terminal.shell", "terminal.dir",
 		"terminal.allow_osc52", "terminal.download_dir",

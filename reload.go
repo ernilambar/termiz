@@ -84,6 +84,9 @@ func configChanges(old, next config) (live, restart []string) {
 	if !maps.Equal(old.Keybindings, next.Keybindings) {
 		live = append(live, "keybindings")
 	}
+	if old.Window.Maximize != next.Window.Maximize {
+		live = append(live, "window.maximize")
+	}
 	if old.Window.Padding != next.Window.Padding {
 		live = append(live, "window.padding")
 	}
@@ -91,11 +94,8 @@ func configChanges(old, next config) (live, restart []string) {
 		live = append(live, "window.confirm_on_quit")
 	}
 
-	// These have no live setter in go-term v0.17.1, or describe how the
-	// process was started, so they take effect on the next launch.
-	if old.Window.Maximize != next.Window.Maximize {
-		restart = append(restart, "window.maximize")
-	}
+	// These describe how the window or shell was started, so they take
+	// effect on the next launch.
 	if old.Window.Width != next.Window.Width {
 		restart = append(restart, "window.width")
 	}

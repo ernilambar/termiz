@@ -95,9 +95,11 @@ go build ./...
   `WindowCfg.OnCloseRequest` when `window.confirm_on_quit` is true (off by
   default); a shell
   exiting on its own calls `Window.Close` directly and never prompts.
-- Window maximization lives behind `maximizeWindow` (`window_darwin.go`, cgo):
-  go-gui exposes no maximize or fullscreen call, so it zooms the AppKit key
-  window in `OnInit`.
+- Window maximization is `win.Maximize()` in `OnInit` when `window.maximize`
+  is true. go-gui zooms rather than entering fullscreen, so the title bar and
+  traffic lights stay; termiz keeps no cgo of its own. The key is live: a
+  reload calls `win.Maximize()` or `win.Restore()`, which returns the frame
+  the window was zoomed from (the configured size).
 - GUI startup lives inside `gui.WindowCfg.OnInit`; failures there log and close
   the window rather than panicking. `term.Term` is created there and closed via
   the `defer` in `launch`, so closing the window tears down the PTY.

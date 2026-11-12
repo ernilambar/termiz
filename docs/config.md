@@ -74,7 +74,7 @@ scroll-page-up = "none"  # hand PageUp back to the child
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `maximize` | bool | `true` | Open filling the screen's visible area, like Window > Zoom. Set `false` to open at `width`×`height`. |
+| `maximize` | bool | `true` | Open filling the screen's visible area, like Window > Zoom. Set `false` to open at `width`×`height`. Reload Configuration maximizes or restores a running window. |
 | `confirm_on_quit` | bool | `false` | Ask before closing the window or quitting while the shell is still running. A shell that exits on its own closes the window without a prompt. |
 | `width` | int | `1000` | Initial window width in points; must be positive. |
 | `height` | int | `640` | Initial window height in points; must be positive. |

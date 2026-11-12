@@ -54,7 +54,8 @@ The Termiz app menu carries:
 - `Quit` (⌘Q).
 
 The Window menu provides the usual Close, Minimize, and Zoom items. Window
-maximization on launch is `window.maximize`, on by default.
+maximization on launch is `window.maximize`, on by default; reloading the
+configuration applies a change to a running window at once.
 
 ## Session directory
 
