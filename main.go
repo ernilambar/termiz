@@ -129,7 +129,18 @@ func launch() {
 		}
 		applyTermConfig(tm, old, next, named)
 		if old.Theme != next.Theme {
-			gui.SetTheme(chromeTheme(named.Theme))
+			chrome := chromeTheme(named.Theme)
+			gui.SetTheme(chrome)
+			win.TitlebarDark(chrome.TitlebarDark)
+		}
+		if next.Window.Maximize != old.Window.Maximize {
+			if next.Window.Maximize {
+				win.Maximize()
+			} else {
+				// Restore, not a resize: it returns the frame the window
+				// was zoomed from, which is the configured size.
+				win.Restore()
+			}
 		}
 		if next.Window.Padding != old.Window.Padding {
 			win.SetView(paddedView(tm, next.Window.Padding))
@@ -207,8 +218,10 @@ func launch() {
 			win.Dialog(quitDialog(info.Name))
 		},
 		OnInit: func(win *gui.Window) {
+			// Zoom, not fullscreen: the title bar and traffic lights stay,
+			// which is what a terminal wants from "maximized".
 			if cfg.Window.Maximize {
-				maximizeWindow()
+				win.Maximize()
 			}
 
 			var err error
@@ -239,7 +252,11 @@ func launch() {
 		}
 	}()
 
-	gui.SetTheme(chromeTheme(theme))
+	// The chrome is pinned from the terminal theme, so the window frame has
+	// to follow that pin instead of the desktop's light/dark setting.
+	chrome := chromeTheme(theme)
+	gui.SetTheme(chrome)
+	w.TitlebarDark(chrome.TitlebarDark)
 	backend.RunApp(app, w)
 }
 

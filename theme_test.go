@@ -45,13 +45,24 @@ func TestThemeNames(t *testing.T) {
 }
 
 func TestChromeThemeFollowsLightness(t *testing.T) {
-	if got := chromeTheme(term.DefaultTheme); got.ColorBackground != gui.ThemeDark.ColorBackground {
+	dark := chromeTheme(term.DefaultTheme)
+	if dark.ColorBackground != gui.ThemeDark.ColorBackground {
 		t.Error("chromeTheme(default) did not pick the dark chrome")
+	}
+	// The window frame must follow the pinned chrome, not the desktop's
+	// light/dark setting, or a light theme on a dark desktop gets a dark
+	// titlebar.
+	if !dark.TitlebarDark {
+		t.Error("dark chrome must pin a dark titlebar")
 	}
 
 	light := term.DefaultTheme
 	light.DefaultBG = gui.RGB(250, 250, 250)
-	if got := chromeTheme(light); got.ColorBackground != gui.ThemeLight.ColorBackground {
+	got := chromeTheme(light)
+	if got.ColorBackground != gui.ThemeLight.ColorBackground {
 		t.Error("chromeTheme(light background) did not pick the light chrome")
+	}
+	if got.TitlebarDark {
+		t.Error("light chrome must not pin a dark titlebar")
 	}
 }

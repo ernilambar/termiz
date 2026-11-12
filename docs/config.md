@@ -74,7 +74,7 @@ scroll-page-up = "none"  # hand PageUp back to the child
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `maximize` | bool | `true` | Open filling the screen's visible area, like Window > Zoom. Set `false` to open at `width`×`height`. |
+| `maximize` | bool | `true` | Open filling the screen's visible area, like Window > Zoom. Set `false` to open at `width`×`height`. Reload Configuration maximizes or restores a running window. |
 | `confirm_on_quit` | bool | `false` | Ask before closing the window or quitting while the shell is still running. A shell that exits on its own closes the window without a prompt. |
 | `width` | int | `1000` | Initial window width in points; must be positive. |
 | `height` | int | `640` | Initial window height in points; must be positive. |
@@ -142,7 +142,9 @@ starts with and the one `reset` (the shell command and the escape sequences)
 returns to. They are defaults, not overrides: with `cursor_lock = false` an
 application can still change the shape, as vim does for insert mode. Setting
 `cursor_lock = true` makes the window drop those requests, so the configured
-shape and blink hold for the whole session.
+shape and blink hold for the whole session. Enabling the lock through
+`Termiz > Reload Configuration` also reapplies the configured shape and blink,
+so an application that already changed them stops doing so at once.
 
 `shell` is the program to run. `~` and `$VAR` expand, and a bare name is
 looked up in `PATH`, then — because a Dock or Finder launch has launchd's
