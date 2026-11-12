@@ -142,7 +142,9 @@ starts with and the one `reset` (the shell command and the escape sequences)
 returns to. They are defaults, not overrides: with `cursor_lock = false` an
 application can still change the shape, as vim does for insert mode. Setting
 `cursor_lock = true` makes the window drop those requests, so the configured
-shape and blink hold for the whole session.
+shape and blink hold for the whole session. Enabling the lock through
+`Termiz > Reload Configuration` also reapplies the configured shape and blink,
+so an application that already changed them stops doing so at once.
 
 `shell` is the program to run. `~` and `$VAR` expand, and a bare name is
 looked up in `PATH`, then — because a Dock or Finder launch has launchd's

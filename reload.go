@@ -37,14 +37,21 @@ func applyTermConfig(tm liveSettings, old, cfg config, named term.NamedTheme) {
 	if old.Terminal.ScrollbackRows != cfg.Terminal.ScrollbackRows {
 		tm.SetScrollbackRows(cfg.Terminal.ScrollbackRows)
 	}
-	if old.Terminal.CursorStyle != cfg.Terminal.CursorStyle {
+	// Enabling the lock reasserts the configured pair below. SetCursorLocked
+	// only stops future DECSCUSR, so without the reassert a child that already
+	// switched the cursor to blinking would keep it blinking for the rest of
+	// the session even though the file now asks for lock and no blink.
+	lockOn := cfg.Terminal.CursorLock && !old.Terminal.CursorLock
+	if old.Terminal.CursorLock != cfg.Terminal.CursorLock {
+		// Lock before the reassert: between the two calls the child must no
+		// longer be able to override what the reassert is about to set.
+		tm.SetCursorLocked(cfg.Terminal.CursorLock)
+	}
+	if old.Terminal.CursorStyle != cfg.Terminal.CursorStyle || lockOn {
 		tm.SetCursorStyle(cursorStyle(cfg.Terminal.CursorStyle))
 	}
-	if old.Terminal.CursorBlink != cfg.Terminal.CursorBlink {
+	if old.Terminal.CursorBlink != cfg.Terminal.CursorBlink || lockOn {
 		tm.SetCursorBlink(cfg.Terminal.CursorBlink)
-	}
-	if old.Terminal.CursorLock != cfg.Terminal.CursorLock {
-		tm.SetCursorLocked(cfg.Terminal.CursorLock)
 	}
 	if !maps.Equal(old.Keybindings, cfg.Keybindings) {
 		tm.SetKeyBindings(keyBindings(cfg.Keybindings))

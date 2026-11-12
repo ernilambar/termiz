@@ -110,6 +110,23 @@ func TestApplyTermConfigOnlyCallsChangedSetters(t *testing.T) {
 	}
 }
 
+// Enabling cursor_lock must also push the configured shape and blink: the
+// lock only stops future DECSCUSR, so a child that already made the cursor
+// blink would otherwise keep blinking after the reload.
+func TestApplyTermConfigEnablingLockReassertsCursor(t *testing.T) {
+	old := defaultConfig()
+	next := old
+	next.Terminal.CursorLock = true
+	rec := &liveRecorder{}
+	applyTermConfig(rec, old, next, term.NamedTheme{})
+	if want := []string{"SetCursorLocked", "SetCursorStyle", "SetCursorBlink"}; !reflect.DeepEqual(rec.calls, want) {
+		t.Errorf("setters called = %v, want %v", rec.calls, want)
+	}
+	if !rec.locked || rec.blink != next.Terminal.CursorBlink || rec.cursor != term.CursorStyleBlock {
+		t.Errorf("cursor = %v blink %v locked %v, want block/%v/locked", rec.cursor, rec.blink, rec.locked, next.Terminal.CursorBlink)
+	}
+}
+
 func TestConfigChangesLive(t *testing.T) {
 	old := defaultConfig()
 	next := old
