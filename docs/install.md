@@ -2,10 +2,10 @@
 
 ## Supported platforms
 
-termiz targets macOS on Apple silicon only. The Metal backend is Objective-C,
-so cgo is mandatory, and the release workflow builds `darwin/arm64` alone.
-Intel Macs and universal binaries are not supported; the scripts refuse to
-build on an Intel host.
+termiz requires macOS 15 (Sequoia) or later on Apple silicon. The Metal backend
+is Objective-C, so cgo is mandatory, and the release workflow builds
+`darwin/arm64` alone. Older macOS versions, Intel Macs, and universal binaries
+are not supported; the scripts refuse to build on an Intel host.
 
 Running the bare binary needs Go 1.27.3+ and the Xcode Command Line Tools
 (`xcode-select --install`). The app bundle additionally needs the identity in

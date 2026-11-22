@@ -9,7 +9,8 @@ font, theme, and terminal.
 
 ## Quick start
 
-Homebrew is the primary install; macOS on Apple silicon is required.
+Homebrew is the primary install; macOS 15 or later on Apple silicon is
+required.
 
 ```bash
 brew tap ernilambar/tap

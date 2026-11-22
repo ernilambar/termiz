@@ -17,10 +17,10 @@ before you write code.
 ### Requirements
 
 - Go 1.27.3 or later (see `go.mod`)
-- macOS on Apple silicon, plus Xcode Command Line Tools —
-  `xcode-select --install`. The Metal backend is Objective-C, so cgo is
-  required. termiz targets darwin/arm64 only; Linux and Windows are not
-  supported.
+- macOS 15 (Sequoia) or later on Apple silicon, plus Xcode Command Line
+  Tools — `xcode-select --install`. The Metal backend is Objective-C, so cgo is
+  required. termiz targets darwin/arm64 only; older macOS versions, Linux, and
+  Windows are not supported.
 
 ### Set up
 

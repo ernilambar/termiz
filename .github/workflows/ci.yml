@@ -13,6 +13,10 @@ jobs:
     name: Quality gate
     # termiz is darwin/arm64 only, and the Metal backend needs cgo.
     runs-on: macos-15
+    env:
+      # Keep every cgo object, including go-gui's, at the macOS 15 floor.
+      CGO_CFLAGS: -mmacosx-version-min=15.0
+      CGO_LDFLAGS: -mmacosx-version-min=15.0
     steps:
       - uses: actions/checkout@v5
 

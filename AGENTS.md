@@ -8,8 +8,8 @@ running a real shell on a PTY. Go module `github.com/ernilambar/termiz`, with
 
 ## Setup
 
-Go 1.27.3+ (see `go.mod`) on macOS Apple silicon with a C toolchain: the Metal
-backend is Objective-C, so cgo is mandatory. darwin/arm64 only.
+Go 1.27.3+ (see `go.mod`) on macOS 15+ Apple silicon with a C toolchain: the
+Metal backend is Objective-C, so cgo is mandatory. darwin/arm64 only.
 
 ```bash
 go mod download
@@ -38,6 +38,11 @@ gofmt -w .
 
 ## Conventions
 
+- **Minimum macOS:** 15.0. `minos_darwin.go` puts
+  `-mmacosx-version-min=15.0` into cgo's compile and link flags; the scripts
+  and CI export the same in `CGO_CFLAGS`/`CGO_LDFLAGS` so dependency objects
+  match. `scripts/min-macos.sh` fixes buildapp's hardcoded
+  `LSMinimumSystemVersion` 11.0 and re-signs the bundle.
 - Everything stays in `package main`; this is a small single binary.
 - **Shell:** `loginShell` uses `$SHELL`, then the OS login shell (`dscl`), and
   only an empty result defers to go-term's fallback. Never substitute

@@ -40,6 +40,12 @@ if [ -z "$version" ]; then
     exit 1
 fi
 
+# Compile every cgo object, including go-gui's dependency objects, against the
+# macOS 15 SDK floor. Setting the deployment target only on the final link
+# would let a dependency build against newer APIs that do not exist on 15.
+export CGO_CFLAGS="-mmacosx-version-min=15.0 ${CGO_CFLAGS:-}"
+export CGO_LDFLAGS="-mmacosx-version-min=15.0 ${CGO_LDFLAGS:-}"
+
 printf '==> gofmt\n'
 unformatted="$(gofmt -l .)"
 if [ -n "$unformatted" ]; then
@@ -76,6 +82,9 @@ go run github.com/go-gui-org/go-gui/cmd/buildapp \
     -manifest "$root/appinfo.toml" \
     -version "$version" \
     "$root/dist/termiz"
+
+printf '==> macOS 15 minimum\n'
+"$root/scripts/min-macos.sh" "dist/$app_name.app"
 
 app_arch="$(lipo -archs "dist/$app_name.app/Contents/MacOS/termiz")"
 if [ "$app_arch" != "arm64" ]; then
