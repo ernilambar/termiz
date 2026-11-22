@@ -28,6 +28,10 @@ jobs:
       CGO_LDFLAGS: -mmacosx-version-min=15.0
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history and tags, so the release body can diff against the
+          # previous release tag.
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -105,20 +109,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           archive="$APP_NAME-macos-arm64.zip"
-          bundle="$APP_NAME.app"
-          notes="macOS 15 or later on Apple silicon (arm64) only. Older macOS versions and Intel Macs are not supported.
-
-          The app is signed ad hoc only (no Developer ID), so Gatekeeper quarantines it after download:
-
-          \`\`\`sh
-          unzip $archive
-          xattr -dr com.apple.quarantine $bundle
-          mv $bundle /Applications/
-          open /Applications/$bundle
-          \`\`\`"
+          # The previous reachable tag is the diff base; the first release
+          # falls back to the root commit.
+          prev="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          if [ -z "$prev" ]; then
+            prev="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+          fi
+          notes="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$prev...$GITHUB_REF_NAME"
           gh release create "$GITHUB_REF_NAME" \
             --verify-tag \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes \
             --notes "$notes" \
             "dist/$archive" dist/SHA256SUMS
