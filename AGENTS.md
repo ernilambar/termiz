@@ -8,7 +8,7 @@ running a real shell on a PTY. Go module `github.com/ernilambar/termiz`, with
 
 ## Setup
 
-Go 1.27.3+ (see `go.mod`) on macOS 15+ Apple silicon with a C toolchain: the
+Go 1.27.4+ (see `go.mod`) on macOS 15+ Apple silicon with a C toolchain: the
 Metal backend is Objective-C, so cgo is mandatory. darwin/arm64 only.
 
 ```bash

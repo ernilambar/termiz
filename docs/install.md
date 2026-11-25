@@ -7,7 +7,7 @@ is Objective-C, so cgo is mandatory, and the release workflow builds
 `darwin/arm64` alone. Older macOS versions, Intel Macs, and universal binaries
 are not supported; the scripts refuse to build on an Intel host.
 
-Running the bare binary needs Go 1.27.3+ and the Xcode Command Line Tools
+Running the bare binary needs Go 1.27.4+ and the Xcode Command Line Tools
 (`xcode-select --install`). The app bundle additionally needs the identity in
 `appinfo.toml`; its `name` is the display name used everywhere below as
 `<Name>`.
