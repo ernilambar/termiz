@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Keep the pinned action majors current; each bump arrives as one grouped PR
+  # so it is exercised by ci.yml before merging.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

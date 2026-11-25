@@ -3,27 +3,51 @@ name: CI
 on:
   push:
     branches: [main]
+    # Docs-only changes never touch the darwin/arm64 binary, and a macOS
+    # runner-minute is the expensive kind. Do not exclude .github/** here:
+    # an edited workflow must still be exercised.
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - LICENSE
   pull_request:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - LICENSE
 
 permissions:
   contents: read
+
+# A superseded commit on the same branch/PR stops immediately instead of
+# finishing on a macOS runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     name: Quality gate
     # termiz is darwin/arm64 only, and the Metal backend needs cgo.
     runs-on: macos-15
+    timeout-minutes: 15
     env:
       # Keep every cgo object, including go-gui's, at the macOS 15 floor.
       CGO_CFLAGS: -mmacosx-version-min=15.0
       CGO_LDFLAGS: -mmacosx-version-min=15.0
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+          # third_party/go-term is a separate module, so its lockfile is not
+          # covered by the root one; both drive the same module cache.
+          cache-dependency-path: |
+            go.sum
+            third_party/go-term/go.sum
 
       - name: gofmt
         run: |
@@ -34,11 +58,23 @@ jobs:
             exit 1
           fi
 
+      - name: Scripts
+        run: bash -n scripts/*.sh
+
       - name: Vet
         run: go vet ./...
 
       - name: Test
         run: go test ./...
 
+      # go.mod replaces go-term with third_party/go-term, a nested module that
+      # ./... does not descend into. The patches it carries touch term/
+      # rendering, so its tests belong in the same gate as ours.
+      - name: Test patched go-term
+        working-directory: third_party/go-term
+        run: go vet ./... && go test ./...
+
       - name: Build
-        run: go build -o /dev/null .
+        # Same flags as the release binary, so a link that only breaks under
+        # -trimpath/-s/-w fails here instead of after the tag is pushed.
+        run: go build -trimpath -ldflags="-s -w" -o /dev/null .
